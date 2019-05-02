@@ -1,8 +1,12 @@
-$(function() {
+window.addEventListener('load', function() {
+  function getById(id) {
+    return document.getElementById(id);
+  }
+
   function showSection(idToShow) {
     ['loading', 'stats', 'error'].forEach(sectionId => {
-      var section = $('#' + sectionId);
-      section.toggle(sectionId === idToShow);
+      var section = getById(sectionId);
+      section.style.display = sectionId === idToShow ? '' : 'none';
     });
   }
 
@@ -25,27 +29,27 @@ $(function() {
 
       var rank = json.rank;
       var page = Math.ceil(rank / ITEMS_PER_PAGE);
-      $('#rank').text(rank);
-      $('#page').text(page);
-      $('#pageLink').attr(
-        'href',
+      getById('rank').textContent = rank;
+      getById('page').textContent = page;
+      getById('pageLink').href =
         'https://www.ranker.com/crowdranked-list/the-best-movies-of-all-time?page=' +
-          page,
-      );
+        page;
 
       var upvotes = json.votes.upVotes;
       var downvotes = json.votes.downVotes;
       var allVotes = upvotes + downvotes;
-      $('#upvotes').text(upvotes);
-      $('#upvotesPercent').text(percent(upvotes / allVotes));
-      $('#downvotes').text(downvotes);
-      $('#downvotesPercent').text(percent(downvotes / allVotes));
+      getById('upvotes').textContent = upvotes;
+      getById('upvotesPercent').textContent = percent(upvotes / allVotes);
+      getById('downvotes').textContent = downvotes;
+      getById('downvotesPercent').textContent = percent(downvotes / allVotes);
 
       var top5Reranks = json.crowdRankedStats.top5ListCount;
       var reranks = json.crowdRankedStats.totalContributingListCount;
-      $('#top5Reranks').text(top5Reranks);
-      $('#reranks').text(reranks);
-      $('#top5ReranksPercent').text(percent(top5Reranks / reranks));
+      getById('top5Reranks').textContent = top5Reranks;
+      getById('reranks').textContent = reranks;
+      getById('top5ReranksPercent').textContent = percent(
+        top5Reranks / reranks,
+      );
     })
     .catch(function(error) {
       showSection('error');
