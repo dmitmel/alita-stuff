@@ -14,26 +14,48 @@
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700"
+      href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,400i,700,700i"
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
 
   <body>
-    <div id="loading"><i>loading...</i></div>
+    <main>
+      <section id="loading" style="display: none"><i>loading...</i></section>
 
-    <div id="content" style="display: none">
-      current rank is <b id="rank"></b>
-      <br />
-      <a href="#" id="pageLink">on page <b id="page"></b></a>
-    </div>
+      <section id="stats" style="display: none">
+        <h1><i>Alita: Battle Angel</i></h1>
 
-    <div id="error" style="display: none">
-      An error has occured
-      <br />
-      Please contact
-      <a href="https://reddit.com/u/dmitmel">u/dmitmel</a>
-    </div>
+        is currently ranked #<b id="rank"></b> on
+        <a href="#" id="pageLink">page <b id="page"></b></a>
+        <br />
+
+        with <b id="upvotes"></b> upvotes (<b id="upvotesPercent"></b>%) and
+        <b id="downvotes"></b> downvotes (<b id="downvotesPercent"></b>%),
+        <br />
+        and in <b id="top5Reranks"></b> out of <b id="reranks"></b> reranks
+        <!-- prettier-ignore -->
+        (<b id="top5ReranksPercent"></b>%) it is in the top 5
+      </section>
+
+      <section id="error" style="display: none">
+        An error has occured
+        <br />
+        Please contact
+        <a href="https://reddit.com/u/dmitmel">u/dmitmel</a>
+      </section>
+    </main>
+
+    <footer>
+      Created by <a href="https://github.com/dmitmel">Dmytro Meleshko</a>, also
+      known as <a href="https://reddit.com/u/dmitmel">u/dmitmel</a>
+    </footer>
+
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+      integrity="sha256-pasqAKBDmFT4eHoN2ndd6lN370kFiGUFyTiUHWhU7k8="
+      crossorigin="anonymous"
+    ></script>
     <script src="script.js"></script>
   </body>
 </html>
