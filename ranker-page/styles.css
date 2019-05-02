@@ -1,0 +1,21 @@
+html,
+body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-size: 10vmin;
+  font-family: 'Roboto Condensed', sans-serif;
+}
+
+a {
+  text-decoration: none;
+}
+
+#error {
+  color: red;
+}
