@@ -30,9 +30,14 @@ main {
 
 footer {
   margin-top: 1.5em;
-  text-align: center;
 }
 
+header {
+  margin-bottom: 1.5em;
+}
+
+header,
+footer,
 section#loading,
 section#error {
   text-align: center;
