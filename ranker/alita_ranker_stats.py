@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# usage:
+# $ python3 alita_ranker_stats.py | tee -a alita_ranker_stats.csv
+
 import time
 from datetime import datetime
 import sys
