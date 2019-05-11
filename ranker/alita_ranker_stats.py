@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-# usage:
-# $ python3 alita_ranker_stats.py | tee -a alita_ranker_stats.csv
+# usage: python3 alita_ranker_stats.py | tee -a alita_ranker_stats.csv
+# post on /r/alitabattleangel about this script: https://www.reddit.com/r/alitabattleangel/comments/bj0okv/rankercom_statistics/
+# spreadsheet containing all data: https://docs.google.com/spreadsheets/d/17uA2enNFaVfQevSEYOyF5Da0Ek8dJCRL7yM0sK54klY/edit#gid=1911187355
 
 import time
 from datetime import datetime
