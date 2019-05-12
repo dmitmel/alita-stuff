@@ -11,6 +11,7 @@ import csv
 import requests
 
 API_URL = "https://cache-api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes"
+REQUEST_INTERVAL = 5 * 60  # seconds
 
 
 writer = csv.writer(sys.stdout)
@@ -32,5 +33,5 @@ while True:
     )
     sys.stdout.flush()
 
-    while time.time() - t < 60:
-        time.sleep(0.1)
+    while time.time() - t < REQUEST_INTERVAL:
+        time.sleep(1)
