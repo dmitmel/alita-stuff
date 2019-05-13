@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+# usage: GOOGLE_APPLICATION_CREDENTIALS=path/to/firebase-adminsdk-cridentials.json ./fetch.py | tee -a stats.csv
 # post on /r/alitabattleangel about this script: https://www.reddit.com/r/alitabattleangel/comments/bj0okv/rankercom_statistics/
 # spreadsheet containing all data: https://docs.google.com/spreadsheets/d/17uA2enNFaVfQevSEYOyF5Da0Ek8dJCRL7yM0sK54klY/edit#gid=1911187355
 
