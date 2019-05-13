@@ -10,6 +10,7 @@ import csv
 import requests
 import firebase_admin
 from firebase_admin import firestore
+from compress import compress
 
 RANKER_LIST_ID = "298553"
 RANKER_ITEM_ID = "85372114"
@@ -21,18 +22,17 @@ REQUEST_INTERVAL = 5 * 60  # seconds
 
 firebase_admin.initialize_app()
 db = firestore.client()
+db_stats_collection = (
+    db.collection("ranker").document(RANKER_LIST_ID).collection("stats")
+)
 
-csv_writer = csv.writer(sys.stdout)
-db_collection = db.collection("ranker").document(RANKER_LIST_ID).collection("stats")
 
-while True:
-    t = time.time()
-
+def fetch_data():
+    timestamp = datetime.utcnow()
     data = requests.get(API_URL).json()
     votes_data, reranks_data = data["votes"], data["crowdRankedStats"]
-
-    timestamp = datetime.utcfromtimestamp(t)
-    rank, upvotes, downvotes, reranks, top5Reranks = (
+    return (
+        timestamp,
         data["rank"],
         votes_data["upVotes"],
         votes_data["downVotes"],
@@ -40,28 +40,33 @@ while True:
         reranks_data["top5ListCount"],
     )
 
-    csv_writer.writerow(
-        [
-            timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            rank,
-            upvotes,
-            downvotes,
-            reranks,
-            top5Reranks,
-        ]
-    )
-    sys.stdout.flush()
 
-    db_collection.add(
+def fetch_data_periodically():
+    csv_writer = csv.writer(sys.stdout)
+
+    while True:
+        t = time.time()
+
+        row = fetch_data()
+        timestamp, *data = row
+        csv_writer.writerow([timestamp.strftime("%Y-%m-%d %H:%M:%S")] + data)
+        sys.stdout.flush()
+        yield row
+
+        while time.time() - t < REQUEST_INTERVAL:
+            time.sleep(1)
+
+
+for timestamp, rank, upvotes, downvotes, reranks, top5_reranks in compress(
+    fetch_data_periodically(), lambda row: row[1:]
+):
+    db_stats_collection.add(
         {
             "timestamp": timestamp,
             "rank": rank,
             "upvotes": upvotes,
             "downvotes": downvotes,
             "reranks": reranks,
-            "top5Reranks": top5Reranks,
+            "top5_reranks": top5_reranks,
         }
     )
-
-    while time.time() - t < REQUEST_INTERVAL:
-        time.sleep(1)
