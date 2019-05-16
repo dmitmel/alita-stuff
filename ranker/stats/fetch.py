@@ -15,7 +15,7 @@ from compress import compress
 
 RANKER_LIST_ID = "298553"
 RANKER_ITEM_ID = "85372114"
-API_URL = "https://cache-api.ranker.com/lists/{}/items/{}?include=crowdRankedStats,votes".format(
+API_URL = "https://api.ranker.com/lists/{}/items/{}?include=crowdRankedStats,votes".format(
     RANKER_LIST_ID, RANKER_ITEM_ID
 )
 REQUEST_INTERVAL = 5 * 60  # seconds
