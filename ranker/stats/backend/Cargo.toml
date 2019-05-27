@@ -1,0 +1,17 @@
+[package]
+name = "backend"
+version = "0.1.0"
+authors = ["Dmytro Meleshko <dmytro.meleshko@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1"
+tokio = "*"
+futures = "*"
+hyper = "0.12"
+# hyper-tls = "*"
+# iron = { git = "https://github.com/iron/iron" }
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+# csv = "*"
+time = "0.1"
