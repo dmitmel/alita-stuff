@@ -40,14 +40,14 @@ footer {
 
 #timer-wrapper {
   margin: auto;
-  padding: 48px;
+  padding: 0.375em;
+
+  font-size: 128px;
+  line-height: 1;
 }
 
 #timer {
   display: flex;
-
-  font-size: 128px;
-  line-height: 1;
 }
 
 .number {
@@ -58,9 +58,9 @@ footer {
   position: absolute;
   top: 100%;
   left: 50%;
-  transform: translate(-50%, 8px);
+  transform: translate(-50%, 0.0625em);
 
-  font-size: 36px;
+  font-size: 0.28125em;
 }
 
 .digits {
@@ -68,8 +68,8 @@ footer {
 }
 
 .digit {
-  padding: 0 8px;
-  border-radius: 8px;
+  padding: 0 0.0625em;
+  border-radius: 0.0625em;
 
   background-color: #000;
   color: #fff;
@@ -77,9 +77,9 @@ footer {
 }
 
 .digit:not(:last-child) {
-  margin-right: 8px;
+  margin-right: 0.0625em;
 }
 
 .colon {
-  transform: translateY(-8px);
+  transform: translateY(-0.0625em);
 }
