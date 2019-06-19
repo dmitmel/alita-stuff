@@ -8,6 +8,9 @@ window.addEventListener('load', function() {
 
   function update() {
     let millisecondsLeft = COUNTDOWN_DATE - new Date();
+    // Personally, I can't think of an explanation why ceil is used here
+    // instead of floor like everywhere else. I determined with some
+    // experimentation that this is the right way.
     let secondsLeft = Math.ceil(millisecondsLeft / 1000);
     setNumber('seconds', secondsLeft % 60);
     let minutesLeft = Math.floor(secondsLeft / 60);
