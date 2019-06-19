@@ -1,0 +1,58 @@
+html,
+body {
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+#timer {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 128px;
+  line-height: 1;
+}
+
+.number {
+  position: relative;
+}
+
+.digits {
+  display: flex;
+}
+
+.description {
+  position: absolute;
+  width: 100%;
+  margin-top: 8px;
+
+  font-size: 36px;
+  text-align: center;
+}
+
+.digit {
+  padding: 0 8px;
+  border-radius: 8px;
+
+  background-color: #000;
+  color: #fff;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.digit:not(:last-child) {
+  margin-right: 8px;
+}
+
+.colon {
+  padding-bottom: 16px;
+}
