@@ -46,6 +46,12 @@ footer {
   line-height: 1;
 }
 
+@media (orientation: portrait) {
+  #timer-wrapper {
+    font-size: 64px;
+  }
+}
+
 #timer {
   display: flex;
 }
