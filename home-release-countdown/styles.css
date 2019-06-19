@@ -33,11 +33,11 @@ body {
 
 .description {
   position: absolute;
-  width: 100%;
-  margin-top: 8px;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 8px);
 
   font-size: 36px;
-  text-align: center;
 }
 
 .digit {
