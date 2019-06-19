@@ -13,11 +13,38 @@ body {
   font-family: 'Share Tech Mono', monospace;
 }
 
+a {
+  text-decoration: none;
+}
+
+header,
+footer {
+  padding: 0.7em;
+  text-align: center;
+}
+
+main {
+  flex: 1 0 auto;
+
+  display: flex;
+  overflow: scroll;
+}
+
+header {
+  margin-bottom: 1.5em;
+}
+
+footer {
+  margin-top: 1.5em;
+}
+
+#timer-wrapper {
+  margin: auto;
+  padding: 48px;
+}
+
 #timer {
   display: flex;
-  flex: 1 0 auto;
-  align-items: center;
-  justify-content: center;
 
   font-size: 128px;
   line-height: 1;
@@ -27,10 +54,6 @@ body {
   position: relative;
 }
 
-.digits {
-  display: flex;
-}
-
 .description {
   position: absolute;
   top: 100%;
@@ -38,6 +61,10 @@ body {
   transform: translate(-50%, 8px);
 
   font-size: 36px;
+}
+
+.digits {
+  display: flex;
 }
 
 .digit {
@@ -54,5 +81,5 @@ body {
 }
 
 .colon {
-  padding-bottom: 16px;
+  transform: translateY(-8px);
 }
