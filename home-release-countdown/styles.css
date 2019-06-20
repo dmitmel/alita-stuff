@@ -41,6 +41,7 @@ footer {
 #timer-wrapper {
   margin: auto;
   padding: 0.375em;
+  padding-top: 0.0625em;
 
   font-size: 128px;
   line-height: 1;
@@ -64,7 +65,7 @@ footer {
   position: absolute;
   top: 100%;
   left: 50%;
-  transform: translate(-50%, 0.0625em);
+  transform: translate(-50%, 0.222222em);
 
   font-size: 0.28125em;
 }
