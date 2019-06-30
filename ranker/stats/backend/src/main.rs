@@ -7,22 +7,23 @@ extern crate tokio;
 
 use tokio::prelude::*;
 
-use failure::{Error, Fail, Fallible};
+use failure::{Error, Fail, Fallible, ResultExt};
 
 use serde::{Deserialize, Serialize};
 
-use std::io;
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+
 use std::time::{Duration, Instant};
 
-
 const RANKER_API_URL: &str = "http://api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes";
-const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
-
+const FETCH_INTERVAL: Duration = Duration::from_secs(5);
 
 type Timestamp = i64;
 type JsonValue = serde_json::Value;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Record {
   timestamp: Timestamp,
   rank: u64,
@@ -32,7 +33,90 @@ struct Record {
   top5_reranks: u64,
 }
 
+#[derive(Debug)]
+struct Database {
+  file: File,
+  records: Vec<Record>,
+}
+
+impl Database {
+  fn init(path: &Path) -> Fallible<Self> {
+    let file_exists = path.exists();
+
+    let file = OpenOptions::new()
+      .read(true)
+      .write(true)
+      .create(true)
+      .open(path)
+      .with_context(|_| format!("couldn't open file '{}'", path.display()))?;
+
+    let mut state = Self {
+      file,
+      records: vec![],
+    };
+
+    if file_exists {
+      state.read()?;
+    } else {
+      state.write()?;
+    }
+
+    Ok(state)
+  }
+
+  fn push(&mut self, record: Record) -> Fallible<()> {
+    self.file.seek(SeekFrom::End(0))?;
+
+    let mut writer = BufWriter::new(&self.file);
+
+    serde_json::to_writer(&mut writer, &record)?;
+    writer.write_all(b"\n")?;
+    self.records.push(record);
+
+    Ok(())
+  }
+
+  fn read(&mut self) -> Fallible<()> {
+    self.file.seek(SeekFrom::Start(0))?;
+
+    self.records = vec![];
+
+    let mut reader = BufReader::new(&self.file);
+    let mut line_number = 1;
+    let mut line = String::with_capacity(128);
+    while reader.read_line(&mut line)? > 0 {
+      let record = serde_json::from_str(&line).with_context(|_| {
+        format!("couldn't deserialize line {}: {:?}", line_number, line)
+      })?;
+      self.records.push(record);
+      line.clear();
+      line_number += 1;
+    }
+
+    Ok(())
+  }
+
+  fn write(&mut self) -> Fallible<()> {
+    self.file.seek(SeekFrom::Start(0))?;
+
+    let mut writer = BufWriter::new(&self.file);
+    for record in &self.records {
+      serde_json::to_writer(&mut writer, &record)
+        .with_context(|_| format!("couldn't serialize record {:?}", record))?;
+      writer.write_all(b"\n")?;
+    }
+
+    Ok(())
+  }
+}
+
 fn main() {
+  let mut database = try_run(|| {
+    Database::init(Path::new("database.json")).map_err(|e: Error| {
+      Error::from(e.context("database initialization error"))
+    })
+  });
+
   let api_url = hyper::Uri::from_static(RANKER_API_URL);
 
   tokio::run(futures::lazy(move || {
@@ -40,8 +124,7 @@ fn main() {
 
     tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
       .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
-
-      .and_then(move |_instant: Instant| {
+      .and_then(move |_: Instant| {
         let timestamp: Timestamp = time::get_time().sec;
 
         fetch_json(&http_client, api_url.clone())
@@ -52,12 +135,15 @@ fn main() {
             })
           })
       })
-
       .for_each(move |record: Record| -> Fallible<()> {
-        print_record(record)
-          .map_err(|e| Error::from(e.context("I/O error when printing record")))
+        print_record(&record).map_err(|e| {
+          Error::from(e.context("I/O error when printing record"))
+        })?;
+        database.push(record).map_err(|e| {
+          Error::from(e.context("error when pushing record to the database"))
+        })?;
+        Ok(())
       })
-
       .map_err(|e: failure::Error| print_error(e.as_fail()))
   }));
 }
@@ -93,7 +179,7 @@ fn json_to_record(json: JsonValue, timestamp: Timestamp) -> Option<Record> {
   })
 }
 
-fn print_record(record: Record) -> io::Result<()> {
+fn print_record(record: &Record) -> io::Result<()> {
   let stdout = io::stdout();
   let mut stdout = stdout.lock();
   serde_json::to_writer(&mut stdout, &record)?;

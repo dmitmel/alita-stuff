@@ -1,5 +1,2 @@
 __pycache__
 *.pyc
-/ranker/stats/*firebase-adminsdk*.json
-/ranker/stats/*.csv
-/ranker/stats/backend/target
