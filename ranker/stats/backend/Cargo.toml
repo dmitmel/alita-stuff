@@ -8,10 +8,13 @@ edition = "2018"
 failure = "0.1"
 tokio = "*"
 futures = "*"
-hyper = "0.12"
-# hyper-tls = "*"
-# iron = { git = "https://github.com/iron/iron" }
+time = "0.1"
+
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 # csv = "*"
-time = "0.1"
+
+hyper = "0.12"
+# hyper-tls = "*"
+iron = { git = "https://github.com/iron/iron", branch = "master" }
+persistent = { git = "https://github.com/iron/persistent", branch = "master" }

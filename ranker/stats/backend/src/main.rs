@@ -1,19 +1,22 @@
 extern crate failure;
 extern crate futures;
 extern crate hyper;
+extern crate iron;
+extern crate persistent;
 extern crate serde;
 extern crate serde_json;
 extern crate tokio;
 
 mod database;
 mod record;
-
-use tokio::prelude::*;
-
-use failure::{Error, Fail, Fallible};
+mod server;
 
 use std::io;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
+use tokio::prelude::*;
+
+use failure::{Error, Fail, Fallible};
 
 use std::time::{Duration, Instant};
 
@@ -22,12 +25,12 @@ use crate::record::{Record, Timestamp};
 
 const DATABASE_PATH: &str = "database.json";
 const RANKER_API_URL: &str = "http://api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes";
-const FETCH_INTERVAL: Duration = Duration::from_secs(5);
+const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 type JsonValue = serde_json::Value;
 
 fn main() {
-  let mut database = try_run(|| {
+  let db = try_run(|| {
     Database::init(Path::new(DATABASE_PATH)).map_err(|e: Error| {
       Error::from(e.context("database initialization error"))
     })
@@ -37,6 +40,10 @@ fn main() {
 
   tokio::run(futures::lazy(move || {
     let http_client = hyper::Client::new();
+
+    let shared_db = Arc::new(RwLock::new(db));
+
+    tokio::spawn(crate::server::start(shared_db.clone()));
 
     tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
       .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
@@ -55,7 +62,9 @@ fn main() {
         print_record(&record).map_err(|e| {
           Error::from(e.context("I/O error when printing record"))
         })?;
-        database.push(record).map_err(|e| {
+
+        let mut db = shared_db.write().unwrap();
+        db.push(record).map_err(|e| {
           Error::from(e.context("error when pushing record to the database"))
         })?;
         Ok(())

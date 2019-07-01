@@ -9,7 +9,7 @@ use crate::record::Record;
 #[derive(Debug)]
 pub struct Database {
   file: File,
-  records: Vec<Record>,
+  pub records: Vec<Record>,
 }
 
 impl Database {
