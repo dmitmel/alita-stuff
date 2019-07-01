@@ -18,7 +18,26 @@ pub fn start(
     service_fn_ok(move |req: Request<Body>| -> Response<Body> {
       let db = shared_db.read().unwrap();
 
-      let json_bytes: Vec<u8> = serde_json::to_vec(&db.records).unwrap();
+      let mut json_bytes: Vec<u8> = vec![];
+      json_bytes.push(b'[');
+      for record in &db.records {
+        json_bytes.push(b'[');
+        itoa::write(&mut json_bytes, record.timestamp).unwrap();
+        json_bytes.push(b',');
+        itoa::write(&mut json_bytes, record.rank).unwrap();
+        json_bytes.push(b',');
+        itoa::write(&mut json_bytes, record.upvotes).unwrap();
+        json_bytes.push(b',');
+        itoa::write(&mut json_bytes, record.downvotes).unwrap();
+        json_bytes.push(b',');
+        itoa::write(&mut json_bytes, record.reranks).unwrap();
+        json_bytes.push(b',');
+        itoa::write(&mut json_bytes, record.top5_reranks).unwrap();
+        json_bytes.push(b']');
+        json_bytes.push(b',');
+      }
+      json_bytes.pop();
+      json_bytes.push(b']');
 
       let mut res = Response::new(Body::from(json_bytes));
       res.headers_mut().insert(

@@ -16,3 +16,5 @@ serde_json = "*"
 
 hyper = "0.12"
 # hyper-tls = "*"
+
+itoa = "*"

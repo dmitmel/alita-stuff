@@ -1,6 +1,7 @@
 extern crate failure;
 extern crate futures;
 extern crate hyper;
+extern crate itoa;
 extern crate serde;
 extern crate serde_json;
 extern crate tokio;
