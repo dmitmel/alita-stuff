@@ -10,12 +10,12 @@ mod database;
 mod record;
 mod server;
 
+use failure::{Error, Fail, Fallible};
+
 use std::io;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
-
-use failure::{Error, Fail, Fallible};
 
 use std::time::{Duration, Instant};
 
@@ -42,7 +42,7 @@ fn main() {
 
     let shared_db = Arc::new(RwLock::new(db));
 
-    tokio::spawn(crate::server::start(shared_db.clone()));
+    tokio::spawn(server::start(shared_db.clone()));
 
     tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
       .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
