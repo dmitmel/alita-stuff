@@ -60,9 +60,7 @@ impl Service for Handler {
       uri,
       req.version(),
       headers.get(header::REFERER).unwrap_or(&empty_header_value),
-      headers
-        .get(header::USER_AGENT)
-        .unwrap_or(&empty_header_value),
+      headers.get(header::USER_AGENT).unwrap_or(&empty_header_value),
     );
 
     let path = uri.path();
@@ -75,7 +73,7 @@ impl Service for Handler {
         ($($method:ident => $handler:expr),* $(,)?) => {
           match method {
             $(&Method::$method => $handler,)*
-              _ => Ok(simple_status_response(StatusCode::METHOD_NOT_ALLOWED)),
+            _ => Ok(simple_status_response(StatusCode::METHOD_NOT_ALLOWED)),
           }
         };
       }

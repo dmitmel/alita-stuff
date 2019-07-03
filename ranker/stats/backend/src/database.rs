@@ -23,10 +23,7 @@ impl Database {
       .open(path)
       .with_context(|_| format!("couldn't open file '{}'", path.display()))?;
 
-    let mut state = Self {
-      file,
-      records: vec![],
-    };
+    let mut state = Self { file, records: vec![] };
 
     if file_exists {
       state.read()?;
