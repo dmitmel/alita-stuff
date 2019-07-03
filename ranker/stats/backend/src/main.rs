@@ -1,11 +1,3 @@
-extern crate failure;
-extern crate futures;
-extern crate hyper;
-extern crate itoa;
-extern crate serde;
-extern crate serde_json;
-extern crate tokio;
-
 mod database;
 mod record;
 mod server;
@@ -29,6 +21,8 @@ const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 type JsonValue = serde_json::Value;
 
 fn main() {
+  pretty_env_logger::init();
+
   let db = try_run(|| {
     Database::init(Path::new(DATABASE_PATH)).map_err(|e: Error| {
       Error::from(e.context("database initialization error"))
