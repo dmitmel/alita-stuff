@@ -129,7 +129,7 @@ impl Handler {
 
     for record in &db.records {
       json_bytes.push(b'[');
-      itoa::write(&mut json_bytes, record.timestamp).unwrap();
+      itoa::write(&mut json_bytes, record.timestamp.as_secs()).unwrap();
       json_bytes.push(b',');
       itoa::write(&mut json_bytes, record.rank).unwrap();
       json_bytes.push(b',');
@@ -164,7 +164,7 @@ impl Handler {
     );
 
     for record in &db.records {
-      itoa::write(&mut csv_bytes, record.timestamp).unwrap();
+      record.timestamp.format_to(&mut csv_bytes).unwrap();
       csv_bytes.push(b',');
       itoa::write(&mut csv_bytes, record.rank).unwrap();
       csv_bytes.push(b',');

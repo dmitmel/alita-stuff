@@ -41,7 +41,7 @@ fn main() {
     tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
       .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
       .and_then(move |_: Instant| {
-        let timestamp: Timestamp = time::get_time().sec;
+        let timestamp = Timestamp::now();
 
         fetch_json(&http_client, api_url.clone())
           .map_err(|e: Error| Error::from(e.context("API request error")))
