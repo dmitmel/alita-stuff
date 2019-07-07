@@ -13,30 +13,21 @@ REDDIT_API = "https://api.reddit.com"
 REQUEST_INTERVAL = 10 * 60  # seconds
 
 
-def reddit_api_request(url):
-    response = requests.get(
-        REDDIT_API + url,
-        headers={
-            "User-Agent": "subreddit subscriber count tracker v2.0 (by /u/dmitmel)"
-        },
-    )
-    return response.json()
-
-
-def fetch_subreddit_id(name):
-    return reddit_api_request("/r/" + name + "/about")["data"]["name"]
-
-
-SUBREDDIT_IDS = [fetch_subreddit_id(name) for name in SUBREDDITS]
-
-
 def fetch_data():
     timestamp = datetime.utcnow()
-    data = reddit_api_request("/api/info?id=" + ",".join(SUBREDDIT_IDS))["data"]
-    subscribers = [
-        subreddit_data["data"]["subscribers"] for subreddit_data in data["children"]
-    ]
-    return (timestamp, *subscribers)
+    subscribers = []
+    accounts_active = []
+    for subreddit in SUBREDDITS:
+        response = requests.get(
+            REDDIT_API + "/r/" + subreddit + "/about",
+            headers={
+                "User-Agent": "subreddit subscriber count tracker v2.0 (by /u/dmitmel)"
+            },
+        )
+        subreddit_data = response.json()["data"]
+        subscribers.append(subreddit_data["subscribers"])
+        accounts_active.append(subreddit_data["accounts_active"])
+    return (timestamp, *subscribers, *accounts_active)
 
 
 csv_writer = csv.writer(sys.stdout)
