@@ -3,6 +3,7 @@ mod record;
 mod server;
 
 use failure::{Error, Fail, Fallible};
+use log::{error, info};
 
 use std::io;
 use std::path::Path;
@@ -21,7 +22,7 @@ const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 type JsonValue = serde_json::Value;
 
 fn main() {
-  pretty_env_logger::init();
+  env_logger::init();
 
   let db = try_run(|| {
     Database::init(Path::new(DATABASE_PATH)).map_err(|e: Error| {
@@ -52,9 +53,7 @@ fn main() {
           })
       })
       .for_each(move |record: Record| -> Fallible<()> {
-        print_record(&record).map_err(|e| {
-          Error::from(e.context("I/O error when printing record"))
-        })?;
+        info!("{:?}", &record);
 
         let mut db = shared_db.write().unwrap();
         db.push(record).map_err(|e| {
@@ -122,14 +121,14 @@ fn print_error(error: &dyn Fail) {
   let thread = thread::current();
   let name: &str = thread.name().unwrap_or("<unnamed>");
 
-  eprintln!("error in thread '{}': {}", name, error);
+  error!("error in thread '{}': {}", name, error);
 
   for cause in error.iter_causes() {
-    eprintln!("caused by: {}", cause);
+    error!("caused by: {}", cause);
   }
 
   if let Some(backtrace) = error.backtrace() {
-    eprintln!("{}", backtrace);
+    error!("{}", backtrace);
   }
-  eprintln!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
+  error!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
 }
