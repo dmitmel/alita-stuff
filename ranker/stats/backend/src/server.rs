@@ -1,6 +1,7 @@
-use failure::{AsFail, Error, Fallible};
+use failure::{AsFail, Error, Fail, Fallible};
 use log::info;
 
+use futures::sync::oneshot;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
 
@@ -17,7 +18,8 @@ type HttpResponse = Response<Body>;
 
 pub fn start(
   shared_db: Arc<RwLock<Database>>,
-) -> impl Future<Item = (), Error = ()> {
+  shutdown_signal_recv: oneshot::Receiver<()>,
+) -> impl Future<Item = (), Error = Error> {
   let addr: SocketAddr = ([0, 0, 0, 0], 3000).into();
 
   let make_service = make_service_fn(move |socket: &AddrStream| {
@@ -27,8 +29,10 @@ pub fn start(
     })
   });
 
-  let server = hyper::Server::bind(&addr).serve(make_service);
-  server.map_err(|e| eprintln!("server error: {}", e))
+  let server = hyper::Server::bind(&addr)
+    .serve(make_service)
+    .with_graceful_shutdown(shutdown_signal_recv);
+  server.map_err(|e| Error::from(e.context("server error")))
 }
 
 pub struct Handler {
@@ -121,7 +125,7 @@ fn simple_status_response(status: StatusCode) -> Response<Body> {
 }
 
 impl Handler {
-  fn get_json_stats(&mut self, req: &HttpRequest) -> Fallible<HttpResponse> {
+  fn get_json_stats(&mut self, _req: &HttpRequest) -> Fallible<HttpResponse> {
     let db = self.shared_db.read().unwrap();
 
     let mut json_bytes: Vec<u8> = vec![];
@@ -155,7 +159,7 @@ impl Handler {
     Ok(res)
   }
 
-  fn get_csv_stats(&mut self, req: &HttpRequest) -> Fallible<HttpResponse> {
+  fn get_csv_stats(&mut self, _req: &HttpRequest) -> Fallible<HttpResponse> {
     let db = self.shared_db.read().unwrap();
 
     let mut csv_bytes: Vec<u8> = vec![];

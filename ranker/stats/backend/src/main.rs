@@ -3,7 +3,7 @@ mod record;
 mod server;
 
 use failure::{Error, Fail, Fallible};
-use log::{error, info};
+use log::{debug, error, info};
 
 use std::io;
 use std::path::Path;
@@ -17,7 +17,7 @@ use crate::record::{Record, Timestamp};
 
 const DATABASE_PATH: &str = "database.json";
 const RANKER_API_URL: &str = "http://api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes";
-const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
+const FETCH_INTERVAL: Duration = Duration::from_secs(3);
 
 type JsonValue = serde_json::Value;
 
@@ -37,31 +37,59 @@ fn main() {
 
     let shared_db = Arc::new(RwLock::new(db));
 
-    tokio::spawn(server::start(shared_db.clone()));
+    let (server_shutdown_send, server_shutdown_recv) =
+      futures::sync::oneshot::channel::<()>();
+    let (tracker_shutdown_send, tracker_shutdown_recv) =
+      futures::sync::oneshot::channel::<()>();
 
-    tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
-      .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
-      .and_then(move |_: Instant| {
-        let timestamp = Timestamp::now();
+    tokio::spawn(
+      server::start(shared_db.clone(), server_shutdown_recv)
+        .map_err(|e| print_error(e.as_fail()))
+        .then(|_| {
+          if !tracker_shutdown_send.is_canceled() {
+            tracker_shutdown_send.send(()).unwrap();
+          }
+          Ok(())
+        }),
+    );
 
-        fetch_json(&http_client, api_url.clone())
-          .map_err(|e: Error| Error::from(e.context("API request error")))
-          .and_then(move |json: JsonValue| {
-            json_to_record(json, timestamp).ok_or_else(|| {
-              failure::err_msg("malformed JSON response from API")
+    let tracker_future =
+      tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
+        .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
+        .and_then(move |_: Instant| {
+          let timestamp = Timestamp::now();
+          info!("sending a request to {}", RANKER_API_URL);
+
+          fetch_json(&http_client, api_url.clone())
+            .map_err(|e: Error| Error::from(e.context("API request error")))
+            .and_then(move |json: JsonValue| {
+              json_to_record(json, timestamp).ok_or_else(|| {
+                failure::err_msg("malformed JSON response from API")
+              })
             })
-          })
-      })
-      .for_each(move |record: Record| -> Fallible<()> {
-        info!("{:?}", &record);
+        })
+        .for_each(move |record: Record| -> Fallible<()> {
+          info!("{:?}", &record);
 
-        let mut db = shared_db.write().unwrap();
-        db.push(record).map_err(|e| {
-          Error::from(e.context("error when pushing record to the database"))
-        })?;
-        Ok(())
-      })
-      .map_err(|e: failure::Error| print_error(e.as_fail()))
+          let mut db = shared_db.write().unwrap();
+          db.push(record).map_err(|e| {
+            Error::from(e.context("error when pushing record to the database"))
+          })?;
+          Ok(())
+        })
+        .map_err(|e| print_error(e.as_fail()))
+        .select(tracker_shutdown_recv.then(|_| {
+          debug!("signal received, starting graceful shutdown");
+          Ok(())
+        }))
+        .then(|_| {
+          if !server_shutdown_send.is_canceled() {
+            server_shutdown_send.send(()).unwrap();
+          }
+          Ok(())
+        });
+
+    tracker_future
   }));
 }
 
