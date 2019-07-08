@@ -32,65 +32,67 @@ fn main() {
 
   let api_url = hyper::Uri::from_static(RANKER_API_URL);
 
-  tokio::run(futures::lazy(move || {
-    let http_client = hyper::Client::new();
+  let mut runtime =
+    tokio::runtime::Runtime::new().expect("failed to start new Runtime");
 
-    let shared_db = Arc::new(RwLock::new(db));
+  let http_client = hyper::Client::new();
 
-    let (server_shutdown_send, server_shutdown_recv) =
-      futures::sync::oneshot::channel::<()>();
-    let (tracker_shutdown_send, tracker_shutdown_recv) =
-      futures::sync::oneshot::channel::<()>();
+  let shared_db = Arc::new(RwLock::new(db));
 
-    tokio::spawn(
-      server::start(shared_db.clone(), server_shutdown_recv)
-        .map_err(|e| print_error(e.as_fail()))
-        .then(|_| {
-          if !tracker_shutdown_send.is_canceled() {
-            tracker_shutdown_send.send(()).unwrap();
-          }
-          Ok(())
-        }),
-    );
+  let (server_shutdown_send, server_shutdown_recv) =
+    futures::sync::oneshot::channel::<()>();
+  let (tracker_shutdown_send, tracker_shutdown_recv) =
+    futures::sync::oneshot::channel::<()>();
 
-    let tracker_future =
-      tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
-        .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
-        .and_then(move |_: Instant| {
-          let timestamp = Timestamp::now();
-          info!("sending a request to {}", RANKER_API_URL);
+  runtime.spawn(
+    server::start(shared_db.clone(), server_shutdown_recv)
+      .map_err(|e| print_error(&e))
+      .then(|_| {
+        if !tracker_shutdown_send.is_canceled() {
+          tracker_shutdown_send.send(()).unwrap();
+        }
+        Ok(())
+      }),
+  );
 
-          fetch_json(&http_client, api_url.clone())
-            .map_err(|e: Error| Error::from(e.context("API request error")))
-            .and_then(move |json: JsonValue| {
-              json_to_record(json, timestamp).ok_or_else(|| {
-                failure::err_msg("malformed JSON response from API")
-              })
+  runtime.spawn(
+    tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
+      .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
+      .and_then(move |_: Instant| {
+        let timestamp = Timestamp::now();
+        info!("sending a request to {}", RANKER_API_URL);
+
+        fetch_json(&http_client, api_url.clone())
+          .map_err(|e: Error| Error::from(e.context("API request error")))
+          .and_then(move |json: JsonValue| {
+            json_to_record(json, timestamp).ok_or_else(|| {
+              failure::err_msg("malformed JSON response from API")
             })
-        })
-        .for_each(move |record: Record| -> Fallible<()> {
-          info!("{:?}", &record);
+          })
+      })
+      .for_each(move |record: Record| -> Fallible<()> {
+        info!("{:?}", &record);
 
-          let mut db = shared_db.write().unwrap();
-          db.push(record).map_err(|e| {
-            Error::from(e.context("error when pushing record to the database"))
-          })?;
-          Ok(())
-        })
-        .map_err(|e| print_error(e.as_fail()))
-        .select(tracker_shutdown_recv.then(|_| {
-          debug!("signal received, starting graceful shutdown");
-          Ok(())
-        }))
-        .then(|_| {
-          if !server_shutdown_send.is_canceled() {
-            server_shutdown_send.send(()).unwrap();
-          }
-          Ok(())
-        });
+        let mut db = shared_db.write().unwrap();
+        db.push(record).map_err(|e| {
+          Error::from(e.context("error when pushing record to the database"))
+        })?;
+        Ok(())
+      })
+      .map_err(|e| print_error(&e))
+      .select(tracker_shutdown_recv.then(|_| {
+        debug!("signal received, starting graceful shutdown");
+        Ok(())
+      }))
+      .then(|_| {
+        if !server_shutdown_send.is_canceled() {
+          server_shutdown_send.send(()).unwrap();
+        }
+        Ok(())
+      }),
+  );
 
-    tracker_future
-  }));
+  runtime.shutdown_on_idle().wait().unwrap();
 }
 
 fn fetch_json<I>(
@@ -138,12 +140,12 @@ where
   F: FnOnce() -> Fallible<T>,
 {
   f().unwrap_or_else(|e| {
-    print_error(e.as_fail());
+    print_error(&e);
     std::process::exit(1);
   })
 }
 
-fn print_error(error: &dyn Fail) {
+fn print_error(error: &Error) {
   use std::thread;
 
   let thread = thread::current();
@@ -155,8 +157,6 @@ fn print_error(error: &dyn Fail) {
     error!("caused by: {}", cause);
   }
 
-  if let Some(backtrace) = error.backtrace() {
-    error!("{}", backtrace);
-  }
+  error!("{}", error.backtrace());
   error!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
 }
