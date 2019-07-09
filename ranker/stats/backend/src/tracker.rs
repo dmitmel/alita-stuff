@@ -29,17 +29,25 @@ pub fn start(
       fetch_json(&http_client, api_url.clone())
         .map_err(|e: Error| Error::from(e.context("API request error")))
         .and_then(move |json: JsonValue| {
-          json_to_record(json, timestamp)
-            .ok_or_else(|| failure::err_msg("malformed JSON response from API"))
+          match json_to_record(json, timestamp) {
+            Some(record) => Ok(Some(record)),
+            None => Err(failure::err_msg("malformed JSON response from API")),
+          }
+        })
+        .or_else(|e: Error| {
+          log_error!(log::Level::Warn, e.as_fail());
+          Ok(None)
         })
     })
-    .for_each(move |record: Record| -> Fallible<()> {
-      info!("{:?}", &record);
+    .for_each(move |record: Option<Record>| -> Fallible<()> {
+      if let Some(record) = record {
+        info!("{:?}", &record);
 
-      let mut db = shared_db.write().unwrap();
-      db.push(record).map_err(|e| {
-        Error::from(e.context("error when pushing record to the database"))
-      })?;
+        let mut db = shared_db.write().unwrap();
+        db.push(record).map_err(|e| {
+          Error::from(e.context("error when pushing record to the database"))
+        })?;
+      }
 
       Ok(())
     })

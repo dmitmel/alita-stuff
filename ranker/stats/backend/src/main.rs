@@ -1,6 +1,13 @@
 macro_rules! log_error {
   ($log_level:expr, $error:expr) => {
-    crate::log_error($error, $log_level, module_path!(), module_path!(), file!(), line!());
+    crate::log_error(
+      $error,
+      $log_level,
+      module_path!(),
+      module_path!(),
+      file!(),
+      line!(),
+    );
   };
 }
 
@@ -10,7 +17,7 @@ mod server;
 mod tracker;
 
 use failure::{Error, Fail};
-use log::{error, info};
+use log::info;
 
 use futures::sync::oneshot;
 use std::path::Path;
@@ -112,7 +119,10 @@ fn log_error(
   }
 
   if let Some(backtrace) = error.backtrace() {
-    __log!("{}", backtrace);
+    let backtrace_string: String = backtrace.to_string();
+    if !backtrace_string.is_empty() {
+      __log!("{}", backtrace);
+    }
   }
   __log!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
 }
