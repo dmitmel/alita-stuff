@@ -5,6 +5,7 @@ mod server;
 use failure::{Error, Fail, Fallible};
 use log::{debug, error, info};
 
+use futures::sync::oneshot;
 use std::io;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -17,7 +18,7 @@ use crate::record::{Record, Timestamp};
 
 const DATABASE_PATH: &str = "database.json";
 const RANKER_API_URL: &str = "http://api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes";
-const FETCH_INTERVAL: Duration = Duration::from_secs(3);
+const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 type JsonValue = serde_json::Value;
 
@@ -39,23 +40,15 @@ fn main() {
 
   let shared_db = Arc::new(RwLock::new(db));
 
-  let (server_shutdown_send, server_shutdown_recv) =
-    futures::sync::oneshot::channel::<()>();
-  let (tracker_shutdown_send, tracker_shutdown_recv) =
-    futures::sync::oneshot::channel::<()>();
-
-  runtime.spawn(
+  let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
+  let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(shared_db.clone(), server_shutdown_recv)
-      .map_err(|e| print_error(&e))
-      .then(|_| {
-        if !tracker_shutdown_send.is_canceled() {
-          tracker_shutdown_send.send(()).unwrap();
-        }
-        Ok(())
-      }),
+      .map_err(|e| print_error(&e)),
+    &runtime.executor(),
   );
 
-  runtime.spawn(
+  let (tracker_shutdown_send, tracker_shutdown_recv) = oneshot::channel::<()>();
+  let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     tokio::timer::Interval::new(Instant::now(), FETCH_INTERVAL)
       .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
       .and_then(move |_: Instant| {
@@ -77,6 +70,7 @@ fn main() {
         db.push(record).map_err(|e| {
           Error::from(e.context("error when pushing record to the database"))
         })?;
+
         Ok(())
       })
       .map_err(|e| print_error(&e))
@@ -84,15 +78,42 @@ fn main() {
         debug!("signal received, starting graceful shutdown");
         Ok(())
       }))
-      .then(|_| {
+      .then(|result| match result {
+        Ok(((), _)) => Ok(()),
+        Err(((), _)) => Err(()),
+      }),
+    &runtime.executor(),
+  );
+
+  let shutdown_result: Result<(), ()> = runtime.block_on(
+    server_future
+      .select(tracker_future)
+      .then(|result| {
         if !server_shutdown_send.is_canceled() {
           server_shutdown_send.send(()).unwrap();
         }
-        Ok(())
+        if !tracker_shutdown_send.is_canceled() {
+          tracker_shutdown_send.send(()).unwrap();
+        }
+        result
+      })
+      .then(|result| -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        match result {
+          Ok(((), unfinished_future)) => {
+            Box::new(unfinished_future.then(move |_| Ok(())))
+          }
+          Err(((), unfinished_future)) => {
+            Box::new(unfinished_future.then(move |_| Err(())))
+          }
+        }
       }),
   );
 
   runtime.shutdown_on_idle().wait().unwrap();
+
+  if shutdown_result.is_err() {
+    std::process::exit(1);
+  }
 }
 
 fn fetch_json<I>(
