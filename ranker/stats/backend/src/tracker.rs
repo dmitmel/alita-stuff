@@ -43,7 +43,7 @@ pub fn start(
 
       Ok(())
     })
-    .map_err(|e| crate::print_error(e.as_fail()))
+    .map_err(|e| log_error!(log::Level::Error, e.as_fail()))
     .select(shutdown_signal_recv.then(|_| {
       debug!("signal received, starting graceful shutdown");
       Ok(())

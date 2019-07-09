@@ -93,7 +93,7 @@ impl Service for Handler {
       };
 
       handler_result.unwrap_or_else(|error| {
-        crate::print_error(&error.context("HTTP request handler error"));
+        log_error!(log::Level::Warn, &error.context("HTTP request handler error"));
         simple_status_response(StatusCode::INTERNAL_SERVER_ERROR)
       })
     };

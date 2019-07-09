@@ -1,3 +1,9 @@
+macro_rules! log_error {
+  ($log_level:expr, $error:expr) => {
+    crate::log_error($error, $log_level, module_path!(), module_path!(), file!(), line!());
+  };
+}
+
 mod database;
 mod record;
 mod server;
@@ -29,7 +35,7 @@ fn main() {
 fn run() -> Result<(), ()> {
   info!("initializing database");
   let db = Database::init(Path::new(DATABASE_PATH))
-    .map_err(|e: Error| print_error(e.as_fail()))?;
+    .map_err(|e: Error| log_error!(log::Level::Error, e.as_fail()))?;
 
   let mut runtime =
     tokio::runtime::Runtime::new().expect("failed to start new Runtime");
@@ -39,7 +45,7 @@ fn run() -> Result<(), ()> {
   let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(shared_db.clone(), server_shutdown_recv)
-      .map_err(|e| print_error(e.as_fail())),
+      .map_err(|e| log_error!(log::Level::Error, e.as_fail())),
     &runtime.executor(),
   );
 
@@ -78,20 +84,35 @@ fn run() -> Result<(), ()> {
   shutdown_result
 }
 
-fn print_error(error: &dyn Fail) {
-  use std::thread;
-
-  let thread = thread::current();
+fn log_error(
+  error: &dyn Fail,
+  log_level: log::Level,
+  log_target: &str,
+  log_module_path: &str,
+  log_file: &str,
+  log_line: u32,
+) {
+  let thread = std::thread::current();
   let name: &str = thread.name().unwrap_or("<unnamed>");
 
-  error!("error in thread '{}': {}", name, error);
+  macro_rules! __log {
+    ($($arg:tt)+) => ({
+      log::__private_api_log(
+        format_args!($($arg)+),
+        log_level,
+        &(log_target, log_module_path, log_file, log_line),
+      );
+    });
+  }
+
+  __log!("error in thread '{}': {}", name, error);
 
   for cause in error.iter_causes() {
-    error!("caused by: {}", cause);
+    __log!("caused by: {}", cause);
   }
 
   if let Some(backtrace) = error.backtrace() {
-    error!("{}", backtrace);
+    __log!("{}", backtrace);
   }
-  error!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
+  __log!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
 }
