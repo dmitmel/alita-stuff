@@ -3,8 +3,8 @@ mod record;
 mod server;
 mod tracker;
 
-use failure::{Error, Fallible};
-use log::error;
+use failure::{Error, Fail};
+use log::{error, info};
 
 use futures::sync::oneshot;
 use std::path::Path;
@@ -21,12 +21,15 @@ const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 fn main() {
   env_logger::init();
+  if let Err(()) = run() {
+    std::process::exit(1);
+  }
+}
 
-  let db = try_run(|| {
-    Database::init(Path::new(DATABASE_PATH)).map_err(|e: Error| {
-      Error::from(e.context("database initialization error"))
-    })
-  });
+fn run() -> Result<(), ()> {
+  info!("initializing database");
+  let db = Database::init(Path::new(DATABASE_PATH))
+    .map_err(|e: Error| print_error(e.as_fail()))?;
 
   let mut runtime =
     tokio::runtime::Runtime::new().expect("failed to start new Runtime");
@@ -36,7 +39,7 @@ fn main() {
   let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(shared_db.clone(), server_shutdown_recv)
-      .map_err(|e| print_error(&e)),
+      .map_err(|e| print_error(e.as_fail())),
     &runtime.executor(),
   );
 
@@ -72,22 +75,10 @@ fn main() {
 
   runtime.shutdown_on_idle().wait().unwrap();
 
-  if shutdown_result.is_err() {
-    std::process::exit(1);
-  }
+  shutdown_result
 }
 
-fn try_run<T, F>(f: F) -> T
-where
-  F: FnOnce() -> Fallible<T>,
-{
-  f().unwrap_or_else(|e| {
-    print_error(&e);
-    std::process::exit(1);
-  })
-}
-
-fn print_error(error: &Error) {
+fn print_error(error: &dyn Fail) {
   use std::thread;
 
   let thread = thread::current();
@@ -99,6 +90,8 @@ fn print_error(error: &Error) {
     error!("caused by: {}", cause);
   }
 
-  error!("{}", error.backtrace());
+  if let Some(backtrace) = error.backtrace() {
+    error!("{}", backtrace);
+  }
   error!("note: Run with `RUST_BACKTRACE=1` if you don't see a backtrace.");
 }

@@ -1,4 +1,5 @@
 use failure::{Fallible, ResultExt};
+use log::info;
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
@@ -9,13 +10,14 @@ use crate::record::Record;
 #[derive(Debug)]
 pub struct Database {
   file: File,
-  pub records: Vec<Record>,
+  records: Vec<Record>,
 }
 
 impl Database {
   pub fn init(path: &Path) -> Fallible<Self> {
     let file_exists = path.exists();
 
+    info!("opening file '{}'", path.display());
     let file = OpenOptions::new()
       .read(true)
       .write(true)
@@ -23,15 +25,21 @@ impl Database {
       .open(path)
       .with_context(|_| format!("couldn't open file '{}'", path.display()))?;
 
-    let mut state = Self { file, records: vec![] };
+    let mut db = Self { file, records: vec![] };
 
     if file_exists {
-      state.read()?;
+      info!("reading data");
+      db.read()?;
     } else {
-      state.write()?;
+      info!("writing default data to the file");
+      db.write()?;
     }
 
-    Ok(state)
+    Ok(db)
+  }
+
+  pub fn records(&self) -> &[Record] {
+    &self.records
   }
 
   pub fn push(&mut self, record: Record) -> Fallible<()> {
@@ -43,6 +51,7 @@ impl Database {
     writer.write_all(b"\n")?;
     self.records.push(record);
 
+    info!("pushed record #{}", self.records.len());
     Ok(())
   }
 
@@ -63,6 +72,7 @@ impl Database {
       line_number += 1;
     }
 
+    info!("read {} records", self.records.len());
     Ok(())
   }
 
@@ -76,6 +86,7 @@ impl Database {
       writer.write_all(b"\n")?;
     }
 
+    info!("written {} records", self.records.len());
     Ok(())
   }
 }

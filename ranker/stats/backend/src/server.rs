@@ -1,4 +1,4 @@
-use failure::{AsFail, Error, Fail, Fallible};
+use failure::{Error, Fail, Fallible};
 use log::info;
 
 use futures::sync::oneshot;
@@ -93,9 +93,7 @@ impl Service for Handler {
       };
 
       handler_result.unwrap_or_else(|error| {
-        crate::print_error(&Error::from(
-          error.context("HTTP request handler error"),
-        ));
+        crate::print_error(&error.context("HTTP request handler error"));
         simple_status_response(StatusCode::INTERNAL_SERVER_ERROR)
       })
     };
@@ -131,7 +129,7 @@ impl Handler {
     let mut json_bytes: Vec<u8> = vec![];
     json_bytes.push(b'[');
 
-    for record in &db.records {
+    for record in db.records() {
       json_bytes.push(b'[');
       itoa::write(&mut json_bytes, record.timestamp.as_secs()).unwrap();
       json_bytes.push(b',');
@@ -167,7 +165,7 @@ impl Handler {
       b"timestamp,rank,upvotes,downvotes,reranks,top5_reranks\n",
     );
 
-    for record in &db.records {
+    for record in db.records() {
       record.timestamp.format_to(&mut csv_bytes).unwrap();
       csv_bytes.push(b',');
       itoa::write(&mut csv_bytes, record.rank).unwrap();
