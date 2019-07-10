@@ -16,13 +16,14 @@ mod record;
 mod server;
 mod tracker;
 
-use failure::{Error, Fail};
+use failure::{Fail, Fallible, ResultExt};
 use log::info;
 
 use futures::sync::oneshot;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
+
+use std::path::Path;
 
 use std::time::Duration;
 
@@ -34,21 +35,23 @@ const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 fn main() {
   env_logger::init();
-  if let Err(()) = run() {
+  if let Err(e) = run() {
+    log_error!(log::Level::Error, e.as_fail());
     std::process::exit(1);
   }
 }
 
-fn run() -> Result<(), ()> {
+fn run() -> Fallible<()> {
   info!("initializing database");
-  let db = Database::init(Path::new(DATABASE_PATH))
-    .map_err(|e: Error| log_error!(log::Level::Error, e.as_fail()))?;
+  let db = Database::init(Path::new(DATABASE_PATH))?;
 
+  info!("starting tokio runtime");
   let mut runtime =
-    tokio::runtime::Runtime::new().expect("failed to start new Runtime");
+    tokio::runtime::Runtime::new().context("failed to start new Runtime")?;
 
   let shared_db = Arc::new(RwLock::new(db));
 
+  info!("starting a server task");
   let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(shared_db.clone(), server_shutdown_recv)
@@ -56,25 +59,29 @@ fn run() -> Result<(), ()> {
     &runtime.executor(),
   );
 
+  info!("starting a tracker task");
   let (tracker_shutdown_send, tracker_shutdown_recv) = oneshot::channel::<()>();
   let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     tracker::start(shared_db.clone(), tracker_shutdown_recv),
     &runtime.executor(),
   );
 
-  let shutdown_result: Result<(), ()> = runtime.block_on(
-    server_future
-      .select(tracker_future)
-      .then(|result| {
+  let shutdown_result: Result<(), ()> =
+    runtime.block_on(server_future.select(tracker_future).then(
+      |result| -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        info!("one of the tasks has just exited, starting graceful shutdown");
+
         if !server_shutdown_send.is_canceled() {
+          info!("sending a shutdown signal to the server task");
           server_shutdown_send.send(()).unwrap();
         }
+
         if !tracker_shutdown_send.is_canceled() {
+          info!("sending a shutdown signal to the server task");
           tracker_shutdown_send.send(()).unwrap();
         }
-        result
-      })
-      .then(|result| -> Box<dyn Future<Item = (), Error = ()> + Send> {
+
+        info!("waiting for the other task to finish before complete shutdown");
         match result {
           Ok(((), unfinished_future)) => {
             Box::new(unfinished_future.then(move |_| Ok(())))
@@ -83,12 +90,13 @@ fn run() -> Result<(), ()> {
             Box::new(unfinished_future.then(move |_| Err(())))
           }
         }
-      }),
-  );
+      },
+    ));
 
   runtime.shutdown_on_idle().wait().unwrap();
 
   shutdown_result
+    .map_err(|_| failure::err_msg("error in the async code, see logs above"))
 }
 
 fn log_error(
