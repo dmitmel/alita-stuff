@@ -45,7 +45,7 @@ pub fn start(
 
         let mut db = shared_db.write().unwrap();
         db.push(record).map_err(|e| {
-          Error::from(e.context("error when pushing record to the database"))
+          Error::from(e.context("failed to push the record to the database"))
         })?;
       }
 

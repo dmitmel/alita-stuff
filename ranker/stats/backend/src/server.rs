@@ -93,7 +93,7 @@ impl Service for Handler {
       };
 
       handler_result.unwrap_or_else(|error| {
-        log_error!(log::Level::Warn, &error.context("HTTP request handler error"));
+        log_error!(log::Level::Warn, &error.context("request handler error"));
         simple_status_response(StatusCode::INTERNAL_SERVER_ERROR)
       })
     };
@@ -129,7 +129,7 @@ impl Handler {
     let mut json_bytes: Vec<u8> = vec![];
     json_bytes.push(b'[');
 
-    for record in db.records() {
+    db.compress_records(|record| {
       json_bytes.push(b'[');
       itoa::write(&mut json_bytes, record.timestamp.as_secs()).unwrap();
       json_bytes.push(b',');
@@ -144,7 +144,7 @@ impl Handler {
       itoa::write(&mut json_bytes, record.top5_reranks).unwrap();
       json_bytes.push(b']');
       json_bytes.push(b',');
-    }
+    });
 
     json_bytes.pop();
     json_bytes.push(b']');
@@ -165,7 +165,7 @@ impl Handler {
       b"timestamp,rank,upvotes,downvotes,reranks,top5_reranks\n",
     );
 
-    for record in db.records() {
+    db.compress_records(|record| {
       record.timestamp.format_to(&mut csv_bytes).unwrap();
       csv_bytes.push(b',');
       itoa::write(&mut csv_bytes, record.rank).unwrap();
@@ -178,7 +178,7 @@ impl Handler {
       csv_bytes.push(b',');
       itoa::write(&mut csv_bytes, record.top5_reranks).unwrap();
       csv_bytes.push(b'\n');
-    }
+    });
 
     let mut res = Response::new(Body::from(csv_bytes));
     res

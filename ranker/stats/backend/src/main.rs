@@ -51,7 +51,7 @@ fn run() -> Fallible<()> {
 
   let shared_db = Arc::new(RwLock::new(db));
 
-  info!("starting a server task");
+  info!("starting server task");
   let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(shared_db.clone(), server_shutdown_recv)
@@ -59,7 +59,7 @@ fn run() -> Fallible<()> {
     &runtime.executor(),
   );
 
-  info!("starting a tracker task");
+  info!("starting tracker task");
   let (tracker_shutdown_send, tracker_shutdown_recv) = oneshot::channel::<()>();
   let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     tracker::start(shared_db.clone(), tracker_shutdown_recv),

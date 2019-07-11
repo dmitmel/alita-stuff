@@ -42,6 +42,49 @@ impl Database {
     &self.records
   }
 
+  pub fn compress_records<F>(&self, mut callback: F)
+  where
+    F: FnMut(&Record),
+  {
+    if self.records.is_empty() {
+      return;
+    }
+
+    let first_record = &self.records[0];
+    callback(first_record);
+
+    if self.records.len() == 1 {
+      return;
+    }
+
+    let mut prev_record = first_record;
+    let mut prev_record_had_changes = true;
+
+    for record in &self.records[1..] {
+      macro_rules! record_has_changes {
+        ($($field:ident),+ $(,)?) => {
+          $(record.$field != prev_record.$field)||+
+        };
+      }
+
+      if record_has_changes![rank, upvotes, downvotes, reranks, top5_reranks] {
+        if !prev_record_had_changes {
+          callback(prev_record);
+        }
+        prev_record_had_changes = true;
+        callback(record);
+      } else {
+        prev_record_had_changes = false;
+      }
+
+      prev_record = record;
+    }
+
+    if !prev_record_had_changes {
+      callback(prev_record);
+    }
+  }
+
   pub fn push(&mut self, record: Record) -> Fallible<()> {
     self.file.seek(SeekFrom::End(0))?;
 
