@@ -13,20 +13,19 @@ use crate::record::{Record, Timestamp};
 type JsonValue = serde_json::Value;
 
 pub fn start(
+  config: crate::config::TrackerConfig,
   shared_db: Arc<RwLock<Database>>,
   shutdown_signal_recv: oneshot::Receiver<()>,
 ) -> impl Future<Item = (), Error = ()> {
   let http_client = hyper::Client::new();
 
-  let api_url = hyper::Uri::from_static(crate::RANKER_API_URL);
-
-  tokio::timer::Interval::new(Instant::now(), crate::FETCH_INTERVAL)
+  tokio::timer::Interval::new(Instant::now(), config.request_interval)
     .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
     .and_then(move |_: Instant| {
       let timestamp = Timestamp::now();
-      info!("sending a request to {}", crate::RANKER_API_URL);
+      info!("sending a request to '{}'", config.ranker_api_url);
 
-      fetch_json(&http_client, api_url.clone())
+      fetch_json(&http_client, config.ranker_api_url.clone())
         .map_err(|e: Error| Error::from(e.context("API request error")))
         .and_then(move |json: JsonValue| {
           match json_to_record(json, timestamp) {

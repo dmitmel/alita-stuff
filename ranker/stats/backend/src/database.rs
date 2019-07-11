@@ -14,7 +14,8 @@ pub struct Database {
 }
 
 impl Database {
-  pub fn init(path: &Path) -> Fallible<Self> {
+  pub fn init(config: crate::config::DatabaseConfig) -> Fallible<Self> {
+    let path: &Path = &config.path;
     let file_exists = path.exists();
 
     info!("opening file '{}'", path.display());
@@ -23,7 +24,7 @@ impl Database {
       .write(true)
       .create(true)
       .open(path)
-      .with_context(|_| format!("couldn't open file '{}'", path.display()))?;
+      .context("failed to open file")?;
 
     let mut db = Self { file, records: vec![] };
 
@@ -108,7 +109,7 @@ impl Database {
     let mut line = String::with_capacity(128);
     while reader.read_line(&mut line)? > 0 {
       let record = serde_json::from_str(&line).with_context(|_| {
-        format!("couldn't deserialize line {}: {:?}", line_number, line)
+        format!("failed to deserialize line {}: {:?}", line_number, line)
       })?;
       self.records.push(record);
       line.clear();
@@ -125,7 +126,7 @@ impl Database {
     let mut writer = BufWriter::new(&self.file);
     for record in &self.records {
       serde_json::to_writer(&mut writer, &record)
-        .with_context(|_| format!("couldn't serialize record {:?}", record))?;
+        .with_context(|_| format!("failed to serialize record {:?}", record))?;
       writer.write_all(b"\n")?;
     }
 

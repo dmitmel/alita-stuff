@@ -17,11 +17,10 @@ type HttpRequest = Request<Body>;
 type HttpResponse = Response<Body>;
 
 pub fn start(
+  config: crate::config::ServerConfig,
   shared_db: Arc<RwLock<Database>>,
   shutdown_signal_recv: oneshot::Receiver<()>,
 ) -> impl Future<Item = (), Error = Error> {
-  let addr: SocketAddr = ([0, 0, 0, 0], 3000).into();
-
   let make_service = make_service_fn(move |socket: &AddrStream| {
     future::ok::<Handler, Error>(Handler {
       remote_addr: socket.remote_addr(),
@@ -29,7 +28,7 @@ pub fn start(
     })
   });
 
-  let server = hyper::Server::bind(&addr)
+  let server = hyper::Server::bind(&config.address)
     .serve(make_service)
     .with_graceful_shutdown(shutdown_signal_recv);
   server.map_err(|e| Error::from(e.context("server error")))

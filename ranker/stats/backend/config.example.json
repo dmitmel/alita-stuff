@@ -1,0 +1,12 @@
+{
+  "database": {
+    "path": "database.json"
+  },
+  "server": {
+    "address": "0.0.0.0:8080"
+  },
+  "tracker": {
+    "request_interval": 300,
+    "ranker_api_url": "http://api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes"
+  }
+}

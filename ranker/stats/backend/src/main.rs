@@ -11,6 +11,7 @@ macro_rules! log_error {
   };
 }
 
+mod config;
 mod database;
 mod record;
 mod server;
@@ -23,15 +24,10 @@ use futures::sync::oneshot;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
 
-use std::path::Path;
+use std::path::PathBuf;
 
-use std::time::Duration;
-
+use crate::config::Config;
 use crate::database::Database;
-
-const DATABASE_PATH: &str = "database.json";
-const RANKER_API_URL: &str = "http://api.ranker.com/lists/298553/items/85372114?include=crowdRankedStats,votes";
-const FETCH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 
 fn main() {
   env_logger::init();
@@ -42,8 +38,15 @@ fn main() {
 }
 
 fn run() -> Fallible<()> {
+  let config_path = std::env::args_os()
+    .nth(1)
+    .map_or(PathBuf::from("config.json"), PathBuf::from);
+  info!("loading config file '{}'", config_path.display());
+  let config = Config::read(&config_path).context("failed to load config")?;
+
   info!("initializing database");
-  let db = Database::init(Path::new(DATABASE_PATH))?;
+  let db =
+    Database::init(config.database).context("failed to initialize database")?;
 
   info!("starting tokio runtime");
   let mut runtime =
@@ -54,7 +57,7 @@ fn run() -> Fallible<()> {
   info!("starting server task");
   let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
-    server::start(shared_db.clone(), server_shutdown_recv)
+    server::start(config.server, shared_db.clone(), server_shutdown_recv)
       .map_err(|e| log_error!(log::Level::Error, e.as_fail())),
     &runtime.executor(),
   );
@@ -62,7 +65,7 @@ fn run() -> Fallible<()> {
   info!("starting tracker task");
   let (tracker_shutdown_send, tracker_shutdown_recv) = oneshot::channel::<()>();
   let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
-    tracker::start(shared_db.clone(), tracker_shutdown_recv),
+    tracker::start(config.tracker, shared_db.clone(), tracker_shutdown_recv),
     &runtime.executor(),
   );
 
