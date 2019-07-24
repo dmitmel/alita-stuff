@@ -54,13 +54,13 @@ impl Timestamp {
     wr.write_all(b"-")?;
     write_padded_i32(&mut wr, tm.tm_mon + 1, 2)?;
     wr.write_all(b"-")?;
-    write_padded_i32(&mut wr, tm.tm_mday + 1, 2)?;
+    write_padded_i32(&mut wr, tm.tm_mday, 2)?;
     wr.write_all(b" ")?;
-    write_padded_i32(&mut wr, tm.tm_hour + 1, 2)?;
+    write_padded_i32(&mut wr, tm.tm_hour, 2)?;
     wr.write_all(b":")?;
-    write_padded_i32(&mut wr, tm.tm_min + 1, 2)?;
+    write_padded_i32(&mut wr, tm.tm_min, 2)?;
     wr.write_all(b":")?;
-    write_padded_i32(&mut wr, tm.tm_sec + 1, 2)?;
+    write_padded_i32(&mut wr, tm.tm_sec, 2)?;
 
     Ok(())
   }
