@@ -1,7 +1,7 @@
 window.addEventListener('load', function() {
-  // please note that this variable contains a UNIX timestamp with millisecond
-  // precision, not a Date object
-  const COUNTDOWN_DATE = Date.UTC(2019, 7 - 1, 23, 0, 0, 0);
+  let countdownDate = new Date(new Date().getFullYear(), 9 - 1, 9, 0, 0, 0);
+  if (new Date() > countdownDate)
+    countdownDate.setFullYear(countdownDate.getFullYear() + 1);
 
   let digitsElements = {};
   ['days', 'hours', 'minutes', 'seconds'].forEach(id => {
@@ -9,7 +9,7 @@ window.addEventListener('load', function() {
   });
 
   function update() {
-    let millisecondsLeft = COUNTDOWN_DATE - Date.now();
+    let millisecondsLeft = countdownDate.getTime() - Date.now();
     // Personally, I can't think of an explanation why ceil is used here
     // instead of floor like everywhere else. I determined with some
     // experimentation that this is the right way.
