@@ -50,36 +50,36 @@ fn run() -> Fallible<()> {
   info!("initializing database");
   let db =
     Database::init(config.database).context("failed to initialize database")?;
+  let shared_db = Arc::new(RwLock::new(db));
 
   info!("starting tokio runtime");
   let mut runtime =
     tokio::runtime::Runtime::new().context("failed to start new Runtime")?;
 
   let shutdown = Shutdown::new();
-  let shared_db = Arc::new(RwLock::new(db));
-
   let signals_future: oneshot::SpawnHandle<(), ()> =
     oneshot::spawn(receive_signals(shutdown.another()), &runtime.executor());
-
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(config.server, shared_db.clone(), shutdown.another()),
     &runtime.executor(),
   );
-
   let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     tracker::start(config.tracker, shared_db.clone(), shutdown.another()),
     &runtime.executor(),
   );
 
-  let shutdown_result: Result<(), ()> = runtime.block_on(
-    signals_future
-      .join3(server_future, tracker_future)
-      .map(|_: ((), (), ())| ()),
-  );
+  let shutdown_result: Result<(), ()> = runtime
+    .block_on(signals_future.join3(server_future, tracker_future).map(|_| ()));
   runtime.shutdown_on_idle().wait().unwrap();
+  if shutdown_result.is_err() {
+    return Err(failure::err_msg("error in the async code, see logs above"));
+  }
 
-  shutdown_result
-    .map_err(|_| failure::err_msg("error in the async code, see logs above"))
+  info!("synchronizing database before shutdown");
+  let mut db = shared_db.write().unwrap();
+  db.write()?;
+
+  Ok(())
 }
 
 fn receive_signals(shutdown: Shutdown) -> impl Future<Item = (), Error = ()> {
