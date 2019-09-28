@@ -1,7 +1,6 @@
-use failure::{Error, Fail, Fallible};
+use failure::{AsFail, Error, Fallible};
 use log::info;
 
-use futures::sync::oneshot;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
 
@@ -12,6 +11,7 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 use std::net::SocketAddr;
 
 use crate::database::Database;
+use crate::shutdown::Shutdown;
 
 type HttpRequest = Request<Body>;
 type HttpResponse = Response<Body>;
@@ -19,8 +19,10 @@ type HttpResponse = Response<Body>;
 pub fn start(
   config: crate::config::ServerConfig,
   shared_db: Arc<RwLock<Database>>,
-  shutdown_signal_recv: oneshot::Receiver<()>,
-) -> impl Future<Item = (), Error = Error> {
+  shutdown: Shutdown,
+) -> impl Future<Item = (), Error = ()> {
+  info!("starting");
+
   let make_service = make_service_fn(move |socket: &AddrStream| {
     future::ok::<Handler, Error>(Handler {
       remote_addr: socket.remote_addr(),
@@ -30,8 +32,11 @@ pub fn start(
 
   let server = hyper::Server::bind(&config.address)
     .serve(make_service)
-    .with_graceful_shutdown(shutdown_signal_recv);
-  server.map_err(|e| Error::from(e.context("server error")))
+    .with_graceful_shutdown(shutdown);
+  server.map_err(|e| log_error!(log::Level::Error, e.as_fail())).then(|r| {
+    info!("stopping");
+    r
+  })
 }
 
 pub struct Handler {

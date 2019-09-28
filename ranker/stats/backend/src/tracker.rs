@@ -1,7 +1,6 @@
 use failure::{Error, Fail, Fallible};
-use log::{debug, info};
+use log::info;
 
-use futures::sync::oneshot;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
 
@@ -9,14 +8,17 @@ use std::time::Instant;
 
 use crate::database::Database;
 use crate::record::{Record, Timestamp};
+use crate::shutdown::Shutdown;
 
 type JsonValue = serde_json::Value;
 
 pub fn start(
   config: crate::config::TrackerConfig,
   shared_db: Arc<RwLock<Database>>,
-  shutdown_signal_recv: oneshot::Receiver<()>,
+  shutdown: Shutdown,
 ) -> impl Future<Item = (), Error = ()> {
+  info!("starting");
+
   let http_client = hyper::Client::new();
 
   tokio::timer::Interval::new(Instant::now(), config.request_interval)
@@ -51,13 +53,13 @@ pub fn start(
       Ok(())
     })
     .map_err(|e| log_error!(log::Level::Error, e.as_fail()))
-    .select(shutdown_signal_recv.then(|_| {
-      debug!("signal received, starting graceful shutdown");
-      Ok(())
-    }))
-    .then(|result| match result {
-      Ok(((), _)) => Ok(()),
-      Err(((), _)) => Err(()),
+    .select(shutdown)
+    .then(|r: Result<((), _), ((), _)>| {
+      info!("stopping");
+      match r {
+        Ok(((), _)) => Ok(()),
+        Err(((), _)) => Err(()),
+      }
     })
 }
 

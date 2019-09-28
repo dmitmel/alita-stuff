@@ -15,6 +15,7 @@ mod config;
 mod database;
 mod record;
 mod server;
+mod shutdown;
 mod tracker;
 
 use failure::{Fail, Fallible, ResultExt};
@@ -52,50 +53,21 @@ fn run() -> Fallible<()> {
   let mut runtime =
     tokio::runtime::Runtime::new().context("failed to start new Runtime")?;
 
+  let shutdown = shutdown::Shutdown::new();
   let shared_db = Arc::new(RwLock::new(db));
 
-  info!("starting server task");
-  let (server_shutdown_send, server_shutdown_recv) = oneshot::channel::<()>();
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
-    server::start(config.server, shared_db.clone(), server_shutdown_recv)
-      .map_err(|e| log_error!(log::Level::Error, e.as_fail())),
+    server::start(config.server, shared_db.clone(), shutdown.another()),
     &runtime.executor(),
   );
 
-  info!("starting tracker task");
-  let (tracker_shutdown_send, tracker_shutdown_recv) = oneshot::channel::<()>();
   let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
-    tracker::start(config.tracker, shared_db.clone(), tracker_shutdown_recv),
+    tracker::start(config.tracker, shared_db.clone(), shutdown.another()),
     &runtime.executor(),
   );
 
   let shutdown_result: Result<(), ()> =
-    runtime.block_on(server_future.select(tracker_future).then(
-      |result| -> Box<dyn Future<Item = (), Error = ()> + Send> {
-        info!("one of the tasks has just exited, starting graceful shutdown");
-
-        if !server_shutdown_send.is_canceled() {
-          info!("sending a shutdown signal to the server task");
-          server_shutdown_send.send(()).unwrap();
-        }
-
-        if !tracker_shutdown_send.is_canceled() {
-          info!("sending a shutdown signal to the server task");
-          tracker_shutdown_send.send(()).unwrap();
-        }
-
-        info!("waiting for the other task to finish before complete shutdown");
-        match result {
-          Ok(((), unfinished_future)) => {
-            Box::new(unfinished_future.then(move |_| Ok(())))
-          }
-          Err(((), unfinished_future)) => {
-            Box::new(unfinished_future.then(move |_| Err(())))
-          }
-        }
-      },
-    ));
-
+    runtime.block_on(server_future.join(tracker_future).map(|_: ((), ())| ()));
   runtime.shutdown_on_idle().wait().unwrap();
 
   shutdown_result
