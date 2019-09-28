@@ -18,17 +18,19 @@ mod server;
 mod shutdown;
 mod tracker;
 
-use failure::{Fail, Fallible, ResultExt};
+use failure::{AsFail, Fail, Fallible, ResultExt};
 use log::info;
 
 use futures::sync::oneshot;
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
+use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 
 use std::path::PathBuf;
 
 use crate::config::Config;
 use crate::database::Database;
+use crate::shutdown::Shutdown;
 
 fn main() {
   env_logger::init();
@@ -53,8 +55,11 @@ fn run() -> Fallible<()> {
   let mut runtime =
     tokio::runtime::Runtime::new().context("failed to start new Runtime")?;
 
-  let shutdown = shutdown::Shutdown::new();
+  let shutdown = Shutdown::new();
   let shared_db = Arc::new(RwLock::new(db));
+
+  let signals_future: oneshot::SpawnHandle<(), ()> =
+    oneshot::spawn(receive_signals(shutdown.another()), &runtime.executor());
 
   let server_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
     server::start(config.server, shared_db.clone(), shutdown.another()),
@@ -66,12 +71,38 @@ fn run() -> Fallible<()> {
     &runtime.executor(),
   );
 
-  let shutdown_result: Result<(), ()> =
-    runtime.block_on(server_future.join(tracker_future).map(|_: ((), ())| ()));
+  let shutdown_result: Result<(), ()> = runtime.block_on(
+    signals_future
+      .join3(server_future, tracker_future)
+      .map(|_: ((), (), ())| ()),
+  );
   runtime.shutdown_on_idle().wait().unwrap();
 
   shutdown_result
     .map_err(|_| failure::err_msg("error in the async code, see logs above"))
+}
+
+fn receive_signals(shutdown: Shutdown) -> impl Future<Item = (), Error = ()> {
+  let sigint = Signal::new(SIGINT).flatten_stream();
+  let sigterm = Signal::new(SIGTERM).flatten_stream();
+  Stream::select(sigint, sigterm)
+    .into_future()
+    .then(|r| match r {
+      Ok((Some(s), _)) => {
+        info!("received signal {:?}", s);
+        Ok(())
+      }
+      Ok((None, _)) => unreachable!(),
+      Err((e, _)) => {
+        log_error!(log::Level::Error, e.as_fail());
+        Err(())
+      }
+    })
+    .select(shutdown)
+    .then(|r| match r {
+      Ok(((), _)) => Ok(()),
+      Err(((), _)) => Err(()),
+    })
 }
 
 fn log_error(
