@@ -21,7 +21,7 @@ pub fn start(
   shared_db: Arc<RwLock<Database>>,
   shutdown: Shutdown,
 ) -> impl Future<Item = (), Error = ()> {
-  info!("starting");
+  info!("starting on {}", config.address);
 
   let make_service = make_service_fn(move |socket: &AddrStream| {
     future::ok::<Handler, Error>(Handler {
