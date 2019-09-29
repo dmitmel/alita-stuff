@@ -12,13 +12,14 @@ use std::net::SocketAddr;
 
 use crate::database::Database;
 use crate::shutdown::Shutdown;
+use crate::tracker;
 
 type HttpRequest = Request<Body>;
 type HttpResponse = Response<Body>;
 
 pub fn start(
   config: crate::config::ServerConfig,
-  shared_db: Arc<RwLock<Database>>,
+  shared_db: Arc<RwLock<Database<tracker::DataPoint>>>,
   shutdown: Shutdown,
 ) -> impl Future<Item = (), Error = ()> {
   info!("starting on {}", config.address);
@@ -41,7 +42,7 @@ pub fn start(
 
 pub struct Handler {
   remote_addr: SocketAddr,
-  shared_db: Arc<RwLock<Database>>,
+  shared_db: Arc<RwLock<Database<tracker::DataPoint>>>,
 }
 
 impl Service for Handler {
@@ -137,15 +138,15 @@ impl Handler {
       json_bytes.push(b'[');
       itoa::write(&mut json_bytes, record.timestamp.as_secs()).unwrap();
       json_bytes.push(b',');
-      itoa::write(&mut json_bytes, record.rank).unwrap();
+      itoa::write(&mut json_bytes, record.data.rank).unwrap();
       json_bytes.push(b',');
-      itoa::write(&mut json_bytes, record.upvotes).unwrap();
+      itoa::write(&mut json_bytes, record.data.upvotes).unwrap();
       json_bytes.push(b',');
-      itoa::write(&mut json_bytes, record.downvotes).unwrap();
+      itoa::write(&mut json_bytes, record.data.downvotes).unwrap();
       json_bytes.push(b',');
-      itoa::write(&mut json_bytes, record.reranks).unwrap();
+      itoa::write(&mut json_bytes, record.data.reranks).unwrap();
       json_bytes.push(b',');
-      itoa::write(&mut json_bytes, record.top5_reranks).unwrap();
+      itoa::write(&mut json_bytes, record.data.top5_reranks).unwrap();
       json_bytes.push(b']');
       json_bytes.push(b',');
     });
@@ -172,15 +173,15 @@ impl Handler {
     db.compress_records(|record| {
       record.timestamp.format_to(&mut csv_bytes).unwrap();
       csv_bytes.push(b',');
-      itoa::write(&mut csv_bytes, record.rank).unwrap();
+      itoa::write(&mut csv_bytes, record.data.rank).unwrap();
       csv_bytes.push(b',');
-      itoa::write(&mut csv_bytes, record.upvotes).unwrap();
+      itoa::write(&mut csv_bytes, record.data.upvotes).unwrap();
       csv_bytes.push(b',');
-      itoa::write(&mut csv_bytes, record.downvotes).unwrap();
+      itoa::write(&mut csv_bytes, record.data.downvotes).unwrap();
       csv_bytes.push(b',');
-      itoa::write(&mut csv_bytes, record.reranks).unwrap();
+      itoa::write(&mut csv_bytes, record.data.reranks).unwrap();
       csv_bytes.push(b',');
-      itoa::write(&mut csv_bytes, record.top5_reranks).unwrap();
+      itoa::write(&mut csv_bytes, record.data.top5_reranks).unwrap();
       csv_bytes.push(b'\n');
     });
 

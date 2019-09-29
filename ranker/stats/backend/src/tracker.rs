@@ -12,9 +12,18 @@ use crate::shutdown::Shutdown;
 
 type JsonValue = serde_json::Value;
 
+#[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DataPoint {
+  pub rank: u64,
+  pub upvotes: u64,
+  pub downvotes: u64,
+  pub reranks: u64,
+  pub top5_reranks: u64,
+}
+
 pub fn start(
   config: crate::config::TrackerConfig,
-  shared_db: Arc<RwLock<Database>>,
+  shared_db: Arc<RwLock<Database<DataPoint>>>,
   shutdown: Shutdown,
 ) -> impl Future<Item = (), Error = ()> {
   info!("starting");
@@ -29,18 +38,16 @@ pub fn start(
 
       fetch_json(&http_client, config.ranker_api_url.clone())
         .map_err(|e: Error| Error::from(e.context("API request error")))
-        .and_then(move |json: JsonValue| {
-          match json_to_record(json, timestamp) {
-            Some(record) => Ok(Some(record)),
-            None => Err(failure::err_msg("malformed JSON response from API")),
-          }
+        .and_then(move |json: JsonValue| match json_to_data_point(json) {
+          Some(data) => Ok(Some(Record { timestamp, data })),
+          None => Err(failure::err_msg("malformed JSON response from API")),
         })
         .or_else(|e: Error| {
           log_error!(log::Level::Warn, e.as_fail());
           Ok(None)
         })
     })
-    .for_each(move |record: Option<Record>| -> Fallible<()> {
+    .for_each(move |record: Option<Record<DataPoint>>| -> Fallible<()> {
       if let Some(record) = record {
         info!("{:?}", &record);
 
@@ -83,9 +90,8 @@ where
     })
 }
 
-fn json_to_record(json: JsonValue, timestamp: Timestamp) -> Option<Record> {
-  Some(Record {
-    timestamp,
+fn json_to_data_point(json: JsonValue) -> Option<DataPoint> {
+  Some(DataPoint {
     rank: json["rank"].as_u64()?,
     upvotes: json["votes"]["upVotes"].as_u64()?,
     downvotes: json["votes"]["downVotes"].as_u64()?,

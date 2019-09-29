@@ -2,13 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Record {
+pub struct Record<T> {
   pub timestamp: Timestamp,
-  pub rank: u64,
-  pub upvotes: u64,
-  pub downvotes: u64,
-  pub reranks: u64,
-  pub top5_reranks: u64,
+  pub data: T,
 }
 
 pub struct Timestamp {
