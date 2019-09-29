@@ -12,14 +12,14 @@ use std::net::SocketAddr;
 
 use crate::database::Database;
 use crate::shutdown::Shutdown;
-use crate::tracker;
+use crate::trackers::ranker;
 
 type HttpRequest = Request<Body>;
 type HttpResponse = Response<Body>;
 
 pub fn start(
   config: crate::config::ServerConfig,
-  shared_db: Arc<RwLock<Database<tracker::DataPoint>>>,
+  shared_db: Arc<RwLock<Database<ranker::DataPoint>>>,
   shutdown: Shutdown,
 ) -> impl Future<Item = (), Error = ()> {
   info!("starting on {}", config.address);
@@ -42,7 +42,7 @@ pub fn start(
 
 pub struct Handler {
   remote_addr: SocketAddr,
-  shared_db: Arc<RwLock<Database<tracker::DataPoint>>>,
+  shared_db: Arc<RwLock<Database<ranker::DataPoint>>>,
 }
 
 impl Service for Handler {

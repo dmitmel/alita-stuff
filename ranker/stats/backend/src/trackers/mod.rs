@@ -1,10 +1,12 @@
+pub mod ranker;
+
 use failure::{Error, Fail, Fallible};
 use log::info;
 
 use std::sync::{Arc, RwLock};
 use tokio::prelude::*;
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::database::Database;
 use crate::record::{Record, Timestamp};
@@ -12,42 +14,44 @@ use crate::shutdown::Shutdown;
 
 type JsonValue = serde_json::Value;
 
-#[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct DataPoint {
-  pub rank: u64,
-  pub upvotes: u64,
-  pub downvotes: u64,
-  pub reranks: u64,
-  pub top5_reranks: u64,
+type HttpClient = hyper::Client<hyper::client::HttpConnector>;
+
+pub trait Tracker {
+  type DataPoint;
+
+  fn describe(&self) -> String;
+
+  fn fetch_data_point(
+    &self,
+    http_client: &HttpClient,
+  ) -> Box<dyn Future<Item = Self::DataPoint, Error = Error> + Send>;
 }
 
-pub fn start(
-  config: crate::config::TrackerConfig,
-  shared_db: Arc<RwLock<Database<DataPoint>>>,
+pub fn start<D: serde::ser::Serialize + std::fmt::Debug>(
+  tracker: Box<dyn Tracker<DataPoint = D> + Send>,
+  request_interval: Duration,
+  shared_db: Arc<RwLock<Database<D>>>,
   shutdown: Shutdown,
 ) -> impl Future<Item = (), Error = ()> {
-  info!("starting");
+  info!("starting {}", tracker.describe());
 
   let http_client = hyper::Client::new();
 
-  tokio::timer::Interval::new(Instant::now(), config.request_interval)
+  tokio::timer::Interval::new(Instant::now(), request_interval)
     .map_err(|e: tokio::timer::Error| Error::from(e.context("timer error")))
     .and_then(move |_: Instant| {
       let timestamp = Timestamp::now();
-      info!("sending a request to '{}'", config.ranker_api_url);
 
-      fetch_json(&http_client, config.ranker_api_url.clone())
-        .map_err(|e: Error| Error::from(e.context("API request error")))
-        .and_then(move |json: JsonValue| match json_to_data_point(json) {
-          Some(data) => Ok(Some(Record { timestamp, data })),
-          None => Err(failure::err_msg("malformed JSON response from API")),
-        })
-        .or_else(|e: Error| {
-          log_error!(log::Level::Warn, e.as_fail());
+      tracker.fetch_data_point(&http_client).then(|r: Result<D, Error>| match r
+      {
+        Ok(data) => Ok(Some(Record { timestamp, data })),
+        Err(e) => {
+          log_error!(log::Level::Warn, &e.context("API request error"));
           Ok(None)
-        })
+        }
+      })
     })
-    .for_each(move |record: Option<Record<DataPoint>>| -> Fallible<()> {
+    .for_each(move |record: Option<Record<D>>| -> Fallible<()> {
       if let Some(record) = record {
         info!("{:?}", &record);
 
@@ -71,12 +75,14 @@ pub fn start(
 }
 
 fn fetch_json<I>(
-  client: &hyper::Client<hyper::client::HttpConnector>,
+  client: &HttpClient,
   url: hyper::Uri,
 ) -> impl Future<Item = I, Error = Error>
 where
   I: serde::de::DeserializeOwned,
 {
+  info!("sending a request to '{}'", url);
+
   let mut req = hyper::Request::new(hyper::Body::default());
   *req.uri_mut() = url;
 
@@ -88,14 +94,4 @@ where
       serde_json::from_slice(&body)
         .map_err(|e| e.context("JSON parse error").into())
     })
-}
-
-fn json_to_data_point(json: JsonValue) -> Option<DataPoint> {
-  Some(DataPoint {
-    rank: json["rank"].as_u64()?,
-    upvotes: json["votes"]["upVotes"].as_u64()?,
-    downvotes: json["votes"]["downVotes"].as_u64()?,
-    reranks: json["crowdRankedStats"]["totalContributingListCount"].as_u64()?,
-    top5_reranks: json["crowdRankedStats"]["top5ListCount"].as_u64()?,
-  })
 }

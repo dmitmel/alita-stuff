@@ -16,7 +16,7 @@ mod database;
 mod record;
 mod server;
 mod shutdown;
-mod tracker;
+mod trackers;
 
 use failure::{AsFail, Fail, Fallible, ResultExt};
 use log::info;
@@ -48,8 +48,8 @@ fn run() -> Fallible<()> {
   let config = Config::read(&config_path).context("failed to load config")?;
 
   info!("initializing database");
-  let db =
-    Database::init(config.database).context("failed to initialize database")?;
+  let db = Database::init(&config.trackers.ranker.database_file)
+    .context("failed to initialize database")?;
   let shared_db = Arc::new(RwLock::new(db));
 
   info!("starting tokio runtime");
@@ -64,7 +64,12 @@ fn run() -> Fallible<()> {
     &runtime.executor(),
   );
   let tracker_future: oneshot::SpawnHandle<(), ()> = oneshot::spawn(
-    tracker::start(config.tracker, shared_db.clone(), shutdown.another()),
+    trackers::start(
+      Box::new(trackers::ranker::RankerTracker::new()),
+      config.trackers.ranker.request_interval,
+      shared_db.clone(),
+      shutdown.another(),
+    ),
     &runtime.executor(),
   );
 

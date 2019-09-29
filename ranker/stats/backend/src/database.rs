@@ -24,8 +24,7 @@ impl<T> Database<T> {
 }
 
 impl<T: DeserializeOwned + Serialize + Debug> Database<T> {
-  pub fn init(config: crate::config::DatabaseConfig) -> Fallible<Self> {
-    let path: &Path = &config.path;
+  pub fn init(path: &Path) -> Fallible<Self> {
     let file_exists = path.exists();
 
     info!("opening file '{}'", path.display());

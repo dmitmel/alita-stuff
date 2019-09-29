@@ -12,9 +12,8 @@ use std::time::Duration;
 
 #[derive(Deserialize)]
 pub struct Config {
-  pub database: DatabaseConfig,
   pub server: ServerConfig,
-  pub tracker: TrackerConfig,
+  pub trackers: TrackersConfig,
 }
 
 impl Config {
@@ -28,21 +27,20 @@ impl Config {
 }
 
 #[derive(Deserialize)]
-pub struct DatabaseConfig {
-  pub path: PathBuf,
+pub struct ServerConfig {
+  pub address: SocketAddr,
 }
 
 #[derive(Deserialize)]
-pub struct ServerConfig {
-  pub address: SocketAddr,
+pub struct TrackersConfig {
+  pub ranker: TrackerConfig,
 }
 
 #[derive(Deserialize)]
 pub struct TrackerConfig {
   #[serde(deserialize_with = "deserialize_seconds")]
   pub request_interval: Duration,
-  #[serde(deserialize_with = "deserialize_uri")]
-  pub ranker_api_url: Uri,
+  pub database_file: PathBuf,
 }
 
 fn deserialize_seconds<'de, D>(deserializer: D) -> Result<Duration, D::Error>
@@ -53,10 +51,10 @@ where
   Ok(Duration::from_secs(secs))
 }
 
-fn deserialize_uri<'de, D>(deserializer: D) -> Result<Uri, D::Error>
-where
-  D: serde::Deserializer<'de>,
-{
-  let s = String::deserialize(deserializer)?;
-  s.parse().map_err(serde::de::Error::custom)
-}
+// fn deserialize_uri<'de, D>(deserializer: D) -> Result<Uri, D::Error>
+// where
+//   D: serde::Deserializer<'de>,
+// {
+//   let s = String::deserialize(deserializer)?;
+//   s.parse().map_err(serde::de::Error::custom)
+// }
