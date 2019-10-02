@@ -9,12 +9,9 @@ use tokio::prelude::*;
 use std::time::{Duration, Instant};
 
 use crate::database::Database;
+use crate::http::HttpClient;
 use crate::record::{Record, Timestamp};
 use crate::shutdown::Shutdown;
-
-type JsonValue = serde_json::Value;
-
-type HttpClient = hyper::Client<hyper::client::HttpConnector>;
 
 pub trait Tracker {
   type DataPoint;
@@ -71,27 +68,5 @@ pub fn start<D: serde::ser::Serialize + std::fmt::Debug>(
         Ok(((), _)) => Ok(()),
         Err(((), _)) => Err(()),
       }
-    })
-}
-
-fn fetch_json<I>(
-  client: &HttpClient,
-  url: hyper::Uri,
-) -> impl Future<Item = I, Error = Error>
-where
-  I: serde::de::DeserializeOwned,
-{
-  info!("sending a request to '{}'", url);
-
-  let mut req = hyper::Request::new(hyper::Body::default());
-  *req.uri_mut() = url;
-
-  client
-    .request(req)
-    .and_then(|res| res.into_body().concat2())
-    .map_err(|e| e.context("network error").into())
-    .and_then(|body| {
-      serde_json::from_slice(&body)
-        .map_err(|e| e.context("JSON parse error").into())
     })
 }

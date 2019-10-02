@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 
-use hyper::Uri;
+// use hyper::Uri;
 use std::net::SocketAddr;
 use std::time::Duration;
 

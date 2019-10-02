@@ -13,6 +13,7 @@ macro_rules! log_error {
 
 mod config;
 mod database;
+mod http;
 mod record;
 mod server;
 mod shutdown;

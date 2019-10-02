@@ -1,4 +1,5 @@
-use super::{fetch_json, HttpClient, JsonValue, Tracker};
+use super::Tracker;
+use crate::http::{get_json, HttpClient, JsonValue};
 use failure::Error;
 use hyper::Uri;
 use tokio::prelude::*;
@@ -35,7 +36,7 @@ impl Tracker for RankerTracker {
     &self,
     http_client: &HttpClient,
   ) -> Box<dyn Future<Item = Self::DataPoint, Error = Error> + Send> {
-    Box::new(fetch_json(&http_client, self.url.clone()).and_then(
+    Box::new(get_json(&http_client, self.url.clone()).and_then(
       |json: JsonValue| {
         json_to_data_point(json)
           .ok_or_else(|| failure::err_msg("malformed JSON response from API"))
