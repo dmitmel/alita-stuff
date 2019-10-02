@@ -115,8 +115,8 @@ fn log_error(
   error: &dyn Fail,
   log_level: log::Level,
   log_target: &str,
-  log_module_path: &str,
-  log_file: &str,
+  log_module_path: &'static str,
+  log_file: &'static str,
   log_line: u32,
 ) {
   let thread = std::thread::current();
