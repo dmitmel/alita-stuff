@@ -1,0 +1,10 @@
+{
+  "name": "backend",
+  "main": "src/main.js",
+  "private": true,
+  "dependencies": {
+    "eslint": "^6.6.0",
+    "eslint-config-dmitmel": "dmitmel/eslint-config-dmitmel",
+    "eslint-plugin-node": "^10.0.0"
+  }
+}
