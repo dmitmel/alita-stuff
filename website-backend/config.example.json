@@ -2,10 +2,14 @@
   "server": {
     "address": "0.0.0.0:8080"
   },
-  "trackers": {
-    "ranker": {
-      "request_interval": 300,
-      "database_file": "database.json"
+  "trackers": [
+    {
+      "type": "ranker",
+      "requestInterval": 300,
+      "options": {
+        "listId": "298553",
+        "itemId": "85372114"
+      }
     }
-  }
+  ]
 }
