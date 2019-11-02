@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const typeCheck = require('./utils/typeCheck');
 
 const TRACKERS_DIRECTORY = path.join(__dirname, 'trackers');
 const TRACKERS = new Map(
@@ -12,15 +13,28 @@ const TRACKERS = new Map(
         TRACKERS_DIRECTORY,
         filename,
       ));
+      typeCheck.assert(name, 'name', 'String');
+      typeCheck.assert(createFetcher, 'createFetcher', 'Function');
+
       return [name, createFetcher];
     }),
 );
 
 module.exports = function start(trackerConfigs) {
-  let intervalIds = trackerConfigs.map(({ type, requestInterval, options }) => {
+  typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
+
+  let intervalIds = trackerConfigs.map(trackerConfig => {
+    typeCheck.assert(trackerConfig, 'trackerConfig', 'Object');
+    let { type, requestInterval, options } = trackerConfig;
+    typeCheck.assert(type, 'type', 'String');
+    typeCheck.assert(requestInterval, 'requestInterval', 'Number');
+    typeCheck.assert(options, 'options', 'Object');
+
     if (!TRACKERS.has(type)) throw new Error(`unknown tracker: ${type}`);
     let createFetcher = TRACKERS.get(type);
     let fetcher = createFetcher(options);
+    typeCheck.assert(fetcher, 'fetcher', 'Function');
+
     console.log(
       `starting tracker with type '${type}', request interval of ${requestInterval} seconds and the following options:`,
       options,
