@@ -10,6 +10,13 @@
         "listId": "298553",
         "itemId": "85372114"
       }
+    },
+    {
+      "type": "reddit",
+      "requestInterval": 600,
+      "options": {
+        "subreddits": ["alitabattleangel", "Gunnm"]
+      }
     }
   ]
 }
