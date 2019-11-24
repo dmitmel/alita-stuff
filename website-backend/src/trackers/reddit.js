@@ -1,4 +1,4 @@
-const axios = require('axios');
+const fetch = require('node-fetch');
 const typeCheck = require('../utils/typeCheck');
 
 const REDDIT_API = 'https://api.reddit.com';
@@ -15,13 +15,13 @@ module.exports = {
     return () =>
       Promise.all(
         subreddits.map(subreddit =>
-          axios
-            .get(`${REDDIT_API}/r/${subreddit}/about`, {
-              headers: {
-                'User-Agent': USER_AGENT,
-              },
-            })
-            .then(({ data }) => {
+          fetch(`${REDDIT_API}/r/${subreddit}/about`, {
+            headers: {
+              'User-Agent': USER_AGENT,
+            },
+          })
+            .then(response => response.json())
+            .then(data => {
               typeCheck.assert(data, 'data', 'Object');
               let subredditData = data.data;
               typeCheck.assert(subredditData, 'subredditData', 'Object');

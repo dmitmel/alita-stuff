@@ -6,7 +6,9 @@
     "node": ">=10"
   },
   "dependencies": {
-    "axios": "^0.19.0",
+    "node-fetch": "^2.6.0"
+  },
+  "devDependencies": {
     "eslint": "^6.6.0",
     "eslint-config-dmitmel": "dmitmel/eslint-config-dmitmel",
     "eslint-plugin-node": "^10.0.0"
