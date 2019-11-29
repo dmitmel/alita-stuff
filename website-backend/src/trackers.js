@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const typeCheck = require('./utils/typeCheck');
+const log = require('./logger');
 
 const TRACKERS_DIRECTORY = path.join(__dirname, 'trackers');
 const TRACKERS = new Map(
@@ -23,7 +24,7 @@ const TRACKERS = new Map(
 module.exports = function start(trackerConfigs) {
   typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
 
-  let intervalIds = trackerConfigs.map(trackerConfig => {
+  let intervalIds = trackerConfigs.map((trackerConfig, index) => {
     typeCheck.assert(trackerConfig, 'trackerConfig', 'Object');
     let { type, requestInterval, options } = trackerConfig;
     typeCheck.assert(type, 'type', 'String');
@@ -35,17 +36,22 @@ module.exports = function start(trackerConfigs) {
     let fetcher = createFetcher(options);
     typeCheck.assert(fetcher, 'fetcher', 'Function');
 
-    console.log(
-      `starting tracker with type '${type}', request interval of ${requestInterval} seconds and the following options:`,
+    log.info(
+      'trackers',
+      `registered tracker #${index}:\n  type: ${type}\n  request interval: ${requestInterval} seconds\n  options:`,
       options,
     );
     return setIntervalImmediately(() => {
       fetcher().then(
         dataPoint => {
-          console.log(new Date(), dataPoint);
+          log.info(
+            'trackers',
+            `received a data point from tracker #${index}:`,
+            dataPoint,
+          );
         },
         error => {
-          console.warn(error);
+          log.warn('trackers', `error in tracker #${index}:`, error);
         },
       );
     }, requestInterval * 1000);
