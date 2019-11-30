@@ -1,8 +1,9 @@
-const http = require('http');
 const fs = require('fs');
+const path = require('path');
 const typeCheck = require('./utils/typeCheck');
 const log = require('./logger');
 const mkdirParents = require('./utils/mkdirParents');
+const fileMode = require('./utils/fileMode');
 const startTrackers = require('./trackers');
 
 let shutdownCallbacks = [];
@@ -19,17 +20,19 @@ let config = JSON.parse(fs.readFileSync(configPath).toString());
 
 typeCheck.assert(config, 'config', 'Object');
 
+const DATABASE_DIR_MODE = fileMode({ owner: 'rwx' });
+
 typeCheck.assert(config.database, 'config.database', 'Object');
 typeCheck.assert(config.database.dir, 'config.database.dir', 'String');
 let databaseDir = config.database.dir;
-mkdirParents.sync(databaseDir);
+mkdirParents.sync(databaseDir, DATABASE_DIR_MODE);
 
-async function start() {
-  let stopTrackers = await startTrackers(config.trackers, databaseDir);
+(async () => {
+  let trackersDatabaseDir = path.join(databaseDir, 'trackers');
+  mkdirParents.sync(trackersDatabaseDir, DATABASE_DIR_MODE);
+  let stopTrackers = await startTrackers(config.trackers, trackersDatabaseDir);
   shutdownCallbacks.push(() => stopTrackers());
-}
-
-start();
+})();
 
 // let server = http.createServer((_req, res) => {
 //   res.end('Hello world!');

@@ -1,11 +1,12 @@
 const fs = require('fs');
 const byline = require('byline');
 const typeCheck = require('./utils/typeCheck');
+const fileMode = require('./utils/fileMode');
 const log = require('./logger');
 
 const COMMON_DATA_FILE_OPTIONS = {
   encoding: 'utf-8',
-  mode: 0o600 & ~process.umask(), // only the owner can read and write
+  mode: fileMode({ owner: 'rw' }),
 };
 
 class Database {
