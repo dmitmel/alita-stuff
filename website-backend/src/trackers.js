@@ -27,7 +27,7 @@ module.exports = async function start(trackerConfigs, databaseDir) {
   typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
   typeCheck.assert(databaseDir, 'databaseDir', 'String');
 
-  let intervalIds = await Promise.all(
+  let trackers = await Promise.all(
     trackerConfigs.map(async (trackerConfig, index) => {
       typeCheck.assert(trackerConfig, 'trackerConfig', 'Object');
       let { type, id, requestInterval, options } = trackerConfig;
@@ -42,7 +42,7 @@ module.exports = async function start(trackerConfigs, databaseDir) {
       typeCheck.assert(fetcher, 'fetcher', 'Function');
 
       log.info(
-        `trackers: registered tracker #${index}:\n  type: ${type}\n  id: ${id}\n  request interval: ${requestInterval} seconds\n  options:`,
+        `trackers: initializing tracker #${index}:\n  type: ${type}\n  id: ${id}\n  request interval: ${requestInterval} seconds\n  options:`,
         options,
       );
 
@@ -50,7 +50,7 @@ module.exports = async function start(trackerConfigs, databaseDir) {
       let database = new PushDatabase(path.join(databaseDir, `${id}.json`));
       await database.init();
 
-      return setIntervalImmediately(() => {
+      let intervalId = setIntervalImmediately(() => {
         let timestamp = Math.floor(
           // UNIX timestamps are stored in seconds, not milliseconds
           new Date().getTime() / 1000,
@@ -65,11 +65,14 @@ module.exports = async function start(trackerConfigs, databaseDir) {
           },
         );
       }, requestInterval * 1000);
+
+      return { intervalId, trackerId: id };
     }),
   );
 
   return function stop() {
-    intervalIds.forEach(intervalId => {
+    trackers.forEach(({ intervalId, trackerId }) => {
+      log.info(`trackers: stopping tracker ${trackerId}`);
       clearInterval(intervalId);
     });
   };
