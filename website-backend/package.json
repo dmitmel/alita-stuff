@@ -6,6 +6,7 @@
     "node": ">=10"
   },
   "dependencies": {
+    "byline": "^5.0.0",
     "chalk": "^3.0.0",
     "node-fetch": "^2.6.0"
   },
