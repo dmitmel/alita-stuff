@@ -11,11 +11,10 @@ const startTrackers = require('./trackers');
 typeCheck.assert(config, 'config', 'Object');
 
 let db = new Database('./database2.json');
-db.init().then(() => {
-  db.records.forEach(r => console.log(r));
-  db.records.push(new Date());
-  return db.write();
-});
+db.init()
+  .then(() => db.records.forEach(r => console.log(r)))
+  .then(() => db.push(new Date()))
+  .then(() => db.write());
 
 startTrackers(config.trackers);
 

@@ -3,7 +3,10 @@ const byline = require('byline');
 const typeCheck = require('./utils/typeCheck');
 const log = require('./logger');
 
-const DATA_FILE_MODE = 0o600; // only the owner can read and write
+const COMMON_DATA_FILE_OPTIONS = {
+  encoding: 'utf-8',
+  mode: 0o600, // only the owner can read and write
+};
 
 class Database {
   constructor(filePath) {
@@ -31,10 +34,10 @@ class Database {
     return new Promise((resolve, reject) => {
       log.info(`database(${this.filePath}): reading data file`);
 
-      let stream1 = fs.createReadStream(this.filePath, {
-        encoding: 'utf-8',
-        mode: DATA_FILE_MODE,
-      });
+      let stream1 = fs.createReadStream(
+        this.filePath,
+        COMMON_DATA_FILE_OPTIONS,
+      );
 
       let stream2 = byline.createStream(stream1);
 
@@ -67,10 +70,10 @@ class Database {
     return new Promise((resolve, reject) => {
       log.info(`database(${this.filePath}): writing into data file`);
 
-      let stream = fs.createWriteStream(this.filePath, {
-        encoding: 'utf-8',
-        mode: DATA_FILE_MODE,
-      });
+      let stream = fs.createWriteStream(
+        this.filePath,
+        COMMON_DATA_FILE_OPTIONS,
+      );
 
       stream.on('error', err => reject(err));
       stream.on('finish', () => resolve());
@@ -81,7 +84,20 @@ class Database {
     });
   }
 
-  push() {}
+  push(record) {
+    return new Promise((resolve, reject) => {
+      this.records.push(record);
+      fs.appendFile(
+        this.filePath,
+        `${JSON.stringify(record)}\n`,
+        COMMON_DATA_FILE_OPTIONS,
+        err => {
+          if (err != null) reject(err);
+          else resolve();
+        },
+      );
+    });
+  }
 }
 
 module.exports = Database;
