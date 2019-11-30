@@ -5,7 +5,7 @@ const log = require('./logger');
 
 const COMMON_DATA_FILE_OPTIONS = {
   encoding: 'utf-8',
-  mode: 0o600, // only the owner can read and write
+  mode: 0o600 & ~process.umask(), // only the owner can read and write
 };
 
 class Database {
@@ -19,7 +19,6 @@ class Database {
   init() {
     return this.read().catch(err => {
       if (err.code === 'ENOENT') {
-        log.warn(`database(${this.filePath}):`, err);
         log.warn(
           `database(${this.filePath}): data file doesn't exist, creating it`,
         );
@@ -81,6 +80,8 @@ class Database {
       this.records.forEach(record => {
         stream.write(`${JSON.stringify(record)}\n`);
       });
+
+      stream.end();
     });
   }
 

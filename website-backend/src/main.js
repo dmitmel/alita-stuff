@@ -1,22 +1,20 @@
 const http = require('http');
 const fs = require('fs');
 const typeCheck = require('./utils/typeCheck');
-const Database = require('./database');
+const mkdirParents = require('./utils/mkdirParents');
+const startTrackers = require('./trackers');
 
 let configPath = process.argv.length > 2 ? process.argv[2] : 'config.json';
 let config = JSON.parse(fs.readFileSync(configPath).toString());
 
-const startTrackers = require('./trackers');
-
 typeCheck.assert(config, 'config', 'Object');
 
-let db = new Database('./database2.json');
-db.init()
-  .then(() => db.records.forEach(r => console.log(r)))
-  .then(() => db.push(new Date()))
-  .then(() => db.write());
+typeCheck.assert(config.database, 'config.database', 'Object');
+typeCheck.assert(config.database.dir, 'config.database.dir', 'String');
+let databaseDir = config.database.dir;
+mkdirParents.sync(databaseDir);
 
-startTrackers(config.trackers);
+startTrackers(config.trackers, databaseDir);
 
 let server = http.createServer((_req, res) => {
   res.end('Hello world!');

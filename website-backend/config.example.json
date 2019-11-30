@@ -1,10 +1,14 @@
 {
+  "database": {
+    "dir": "database"
+  },
   "server": {
     "address": "0.0.0.0:8080"
   },
   "trackers": [
     {
       "type": "ranker",
+      "id": "ranker",
       "requestInterval": 300,
       "options": {
         "listId": "298553",
@@ -13,6 +17,7 @@
     },
     {
       "type": "reddit",
+      "id": "reddit",
       "requestInterval": 600,
       "options": {
         "subreddits": ["alitabattleangel", "Gunnm"]

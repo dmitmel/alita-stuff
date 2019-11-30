@@ -1,5 +1,6 @@
 config.json
 database.json
+database/
 *.csv
 
 target/
