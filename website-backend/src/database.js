@@ -16,10 +16,9 @@ class Database {
   init() {
     return this.read().catch(err => {
       if (err.code === 'ENOENT') {
-        log.warn(`database(${this.filePath})`, err);
+        log.warn(`database(${this.filePath}):`, err);
         log.warn(
-          `database(${this.filePath})`,
-          `data file doesn't exist, creating it`,
+          `database(${this.filePath}): data file doesn't exist, creating it`,
         );
         return this.write();
       } else {
@@ -30,7 +29,7 @@ class Database {
 
   read() {
     return new Promise((resolve, reject) => {
-      log.info(`database(${this.filePath})`, `reading data file`);
+      log.info(`database(${this.filePath}): reading data file`);
 
       let stream1 = fs.createReadStream(this.filePath, {
         encoding: 'utf-8',
@@ -57,8 +56,7 @@ class Database {
 
       stream2.on('end', () => {
         log.info(
-          `database(${this.filePath})`,
-          `read ${this.records.length} records`,
+          `database(${this.filePath}): read ${this.records.length} records`,
         );
         resolve();
       });
@@ -67,7 +65,7 @@ class Database {
 
   write() {
     return new Promise((resolve, reject) => {
-      log.info(`database(${this.filePath})`, 'writing into data file');
+      log.info(`database(${this.filePath}): writing into data file`);
 
       let stream = fs.createWriteStream(this.filePath, {
         encoding: 'utf-8',

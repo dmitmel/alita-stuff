@@ -37,21 +37,19 @@ module.exports = function start(trackerConfigs) {
     typeCheck.assert(fetcher, 'fetcher', 'Function');
 
     log.info(
-      'trackers',
-      `registered tracker #${index}:\n  type: ${type}\n  request interval: ${requestInterval} seconds\n  options:`,
+      `trackers: registered tracker #${index}:\n  type: ${type}\n  request interval: ${requestInterval} seconds\n  options:`,
       options,
     );
     return setIntervalImmediately(() => {
       fetcher().then(
         dataPoint => {
           log.info(
-            'trackers',
-            `received a data point from tracker #${index}:`,
+            `trackers: received a data point from tracker #${index}:`,
             dataPoint,
           );
         },
         error => {
-          log.warn('trackers', `error in tracker #${index}:`, error);
+          log.warn(`trackers: error in tracker #${index}:`, error);
         },
       );
     }, requestInterval * 1000);
