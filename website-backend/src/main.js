@@ -4,7 +4,7 @@ const typeCheck = require('./utils/typeCheck');
 const log = require('./logger');
 const mkdirParents = require('./utils/mkdirParents');
 const fileMode = require('./utils/fileMode');
-const startTrackers = require('./trackers');
+const Trackers = require('./trackers');
 const Server = require('./server');
 
 let shutdownCallbacks = [];
@@ -35,11 +35,9 @@ mkdirParents.sync(databaseDir, DATABASE_DIR_MODE);
   try {
     let trackersDatabaseDir = path.join(databaseDir, 'trackers');
     mkdirParents.sync(trackersDatabaseDir, DATABASE_DIR_MODE);
-    let stopTrackers = await startTrackers(
-      config.trackers,
-      trackersDatabaseDir,
-    );
-    shutdownCallbacks.push(() => stopTrackers());
+    let trackers = new Trackers(config.trackers, trackersDatabaseDir);
+    await trackers.start();
+    shutdownCallbacks.push(() => trackers.stop());
 
     let server = new Server(config.server);
     await server.start();

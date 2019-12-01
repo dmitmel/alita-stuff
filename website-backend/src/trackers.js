@@ -22,14 +22,13 @@ const TRACKERS = new Map(
     }),
 );
 
-async function startTrackers(trackerConfigs, databaseDir) {
-  typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
-  typeCheck.assert(databaseDir, 'databaseDir', 'String');
+class Trackers {
+  constructor(trackerConfigs, databaseDir) {
+    typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
+    typeCheck.assert(databaseDir, 'databaseDir', 'String');
 
-  log.info('starting trackers');
-
-  let startStatuses = await Promise.all(
-    trackerConfigs.map((trackerConfig, index) => {
+    this._databaseDir = databaseDir;
+    this._trackers = trackerConfigs.map((trackerConfig, index) => {
       typeCheck.assert(trackerConfig, 'trackerConfig', 'Object');
       let { type, id, requestInterval, options } = trackerConfig;
       typeCheck.assert(type, 'type', 'String');
@@ -42,32 +41,52 @@ async function startTrackers(trackerConfigs, databaseDir) {
         options,
       );
 
-      if (!TRACKERS.has(type)) throw new Error(`unknown tracker: ${type}`);
+      if (!TRACKERS.has(type)) throw new Error(`unknown tracker type: ${type}`);
       let createFetcher = TRACKERS.get(type);
       let fetcher = createFetcher(options);
       typeCheck.assert(fetcher, 'fetcher', 'Function');
 
-      let tracker = new TrackerRunner({
+      return new TrackerRunner({
         id,
         requestInterval,
         fetcher,
         databaseFile: path.join(databaseDir, `${id}.json`),
       });
+    });
+  }
 
-      return tracker.start().then(
-        () => ({ status: 'success', tracker }),
-        err => {
-          log.error(`tracker(${id}): error while starting:`, err);
-          return { status: 'error', tracker };
-        },
+  async start() {
+    log.info('starting trackers');
+
+    let startStatuses = await Promise.all(
+      this._trackers.map(tracker => {
+        return tracker.start().then(
+          () => ({ status: 'success' }),
+          err => {
+            log.error(`tracker(${tracker.id}): error while starting:`, err);
+            return { status: 'error' };
+          },
+        );
+      }),
+    );
+
+    if (startStatuses.findIndex(({ status }) => status !== 'success') >= 0) {
+      log.error(
+        'failed to start some trackers (see logs above), stopping all running ones',
       );
-    }),
-  );
+      try {
+        await this.stop();
+      } catch (err) {
+        log.error(err);
+      }
+      throw new Error('failed to start trackers');
+    }
+  }
 
-  async function stop() {
+  async stop() {
     log.info('stopping trackers');
     let stopStatuses = await Promise.all(
-      startStatuses.map(({ tracker }) =>
+      this._trackers.map(tracker =>
         tracker.stop().then(
           () => ({ status: 'success' }),
           err => {
@@ -81,20 +100,6 @@ async function startTrackers(trackerConfigs, databaseDir) {
     if (stopStatuses.findIndex(({ status }) => status !== 'success') >= 0) {
       throw new Error('failed to stop some trackers (see logs above)');
     }
-  }
-
-  if (startStatuses.findIndex(({ status }) => status !== 'success') >= 0) {
-    log.error(
-      'failed to start some trackers (see logs above), stopping all running ones',
-    );
-    try {
-      await stop();
-    } catch (err) {
-      log.error(err);
-    }
-    throw new Error('failed to start trackers');
-  } else {
-    return stop;
   }
 }
 
@@ -171,4 +176,4 @@ function setIntervalImmediately(callback, ms, ...args) {
   return setInterval(callback, ms, args);
 }
 
-module.exports = startTrackers;
+module.exports = Trackers;
