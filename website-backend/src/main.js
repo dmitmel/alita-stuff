@@ -7,10 +7,14 @@ const fileMode = require('./utils/fileMode');
 const startTrackers = require('./trackers');
 
 let shutdownCallbacks = [];
-function handleSignal(signal) {
-  log.info('received signal', signal);
+function shutdown() {
   log.info('starting shutdown');
   shutdownCallbacks.forEach(cb => cb());
+}
+
+function handleSignal(signal) {
+  log.info('received signal', signal);
+  shutdown();
 }
 process.on('SIGINT', handleSignal);
 process.on('SIGTERM', handleSignal);
@@ -28,10 +32,18 @@ let databaseDir = config.database.dir;
 mkdirParents.sync(databaseDir, DATABASE_DIR_MODE);
 
 (async () => {
-  let trackersDatabaseDir = path.join(databaseDir, 'trackers');
-  mkdirParents.sync(trackersDatabaseDir, DATABASE_DIR_MODE);
-  let stopTrackers = await startTrackers(config.trackers, trackersDatabaseDir);
-  shutdownCallbacks.push(() => stopTrackers());
+  try {
+    let trackersDatabaseDir = path.join(databaseDir, 'trackers');
+    mkdirParents.sync(trackersDatabaseDir, DATABASE_DIR_MODE);
+    let stopTrackers = await startTrackers(
+      config.trackers,
+      trackersDatabaseDir,
+    );
+    shutdownCallbacks.push(() => stopTrackers());
+  } catch (err) {
+    log.error(err);
+    shutdown();
+  }
 })();
 
 // let server = http.createServer((_req, res) => {

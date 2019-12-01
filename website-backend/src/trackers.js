@@ -3,7 +3,6 @@ const path = require('path');
 const typeCheck = require('./utils/typeCheck');
 const log = require('./logger');
 const PushDatabase = require('./PushDatabase');
-const mkdirParents = require('./utils/mkdirParents');
 
 const TRACKERS_DIRECTORY = path.join(__dirname, 'trackers');
 const TRACKERS = new Map(
@@ -23,12 +22,14 @@ const TRACKERS = new Map(
     }),
 );
 
-module.exports = async function start(trackerConfigs, databaseDir) {
+async function startTrackers(trackerConfigs, databaseDir) {
   typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
   typeCheck.assert(databaseDir, 'databaseDir', 'String');
 
-  let trackers = await Promise.all(
-    trackerConfigs.map(async (trackerConfig, index) => {
+  log.info('starting trackers');
+
+  let startStatuses = await Promise.all(
+    trackerConfigs.map((trackerConfig, index) => {
       typeCheck.assert(trackerConfig, 'trackerConfig', 'Object');
       let { type, id, requestInterval, options } = trackerConfig;
       typeCheck.assert(type, 'type', 'String');
@@ -36,49 +37,138 @@ module.exports = async function start(trackerConfigs, databaseDir) {
       typeCheck.assert(requestInterval, 'requestInterval', 'Number');
       typeCheck.assert(options, 'options', 'Object');
 
-      if (!TRACKERS.has(type)) throw new Error(`unknown tracker: ${type}`);
-      let createFetcher = TRACKERS.get(type);
-      let fetcher = createFetcher(options);
-      typeCheck.assert(fetcher, 'fetcher', 'Function');
-
       log.info(
         `trackers: initializing tracker #${index}:\n  type: ${type}\n  id: ${id}\n  request interval: ${requestInterval} seconds\n  options:`,
         options,
       );
 
-      log.info(`tracker(${id}): initializing database`);
-      let database = new PushDatabase(path.join(databaseDir, `${id}.json`));
-      await database.init();
+      if (!TRACKERS.has(type)) throw new Error(`unknown tracker: ${type}`);
+      let createFetcher = TRACKERS.get(type);
+      let fetcher = createFetcher(options);
+      typeCheck.assert(fetcher, 'fetcher', 'Function');
 
-      let intervalId = setIntervalImmediately(() => {
-        let timestamp = Math.floor(
-          // UNIX timestamps are stored in seconds, not milliseconds
-          new Date().getTime() / 1000,
-        );
-        fetcher().then(
-          data => {
-            log.info(`tracker(${id}): received a data point:`, data);
-            return database.push({ timestamp, data });
-          },
-          error => {
-            log.warn(`tracker(${id}): error:`, error);
-          },
-        );
-      }, requestInterval * 1000);
+      let tracker = new TrackerRunner({
+        id,
+        requestInterval,
+        fetcher,
+        databaseFile: path.join(databaseDir, `${id}.json`),
+      });
 
-      return { intervalId, trackerId: id };
+      return tracker.start().then(
+        () => ({ status: 'success', tracker }),
+        err => {
+          log.error(`tracker(${id}): error while starting:`, err);
+          return { status: 'error', tracker };
+        },
+      );
     }),
   );
 
-  return function stop() {
-    trackers.forEach(({ intervalId, trackerId }) => {
-      log.info(`trackers: stopping tracker ${trackerId}`);
-      clearInterval(intervalId);
-    });
-  };
-};
+  async function stop() {
+    log.info('stopping trackers');
+    let stopStatuses = await Promise.all(
+      startStatuses.map(({ tracker }) =>
+        tracker.stop().then(
+          () => ({ status: 'success' }),
+          err => {
+            log.error(`tracker(${tracker.id}): error while stopping:`, err);
+            return { status: 'error' };
+          },
+        ),
+      ),
+    );
+
+    if (stopStatuses.findIndex(({ status }) => status !== 'success') >= 0) {
+      throw new Error('failed to stop some trackers (see logs above)');
+    }
+  }
+
+  if (startStatuses.findIndex(({ status }) => status !== 'success') >= 0) {
+    log.error(
+      'failed to start some trackers (see logs above), stopping all running ones',
+    );
+    try {
+      await stop();
+    } catch (err) {
+      log.error(err);
+    }
+    throw new Error('failed to start trackers');
+  } else {
+    return stop;
+  }
+}
+
+class TrackerRunner {
+  constructor(options) {
+    typeCheck.assert(options, 'options', 'Object');
+    let { id, requestInterval, fetcher, databaseFile } = options;
+    typeCheck.assert(id, 'id', 'String');
+    typeCheck.assert(requestInterval, 'requestInterval', 'Number');
+    typeCheck.assert(fetcher, 'fetcher', 'Function');
+    typeCheck.assert(databaseFile, 'databaseFile', 'String');
+
+    this.id = id;
+    this.requestInterval = requestInterval;
+    this.fetcher = fetcher;
+    this.databaseFile = databaseFile;
+    this._intervalId = null;
+    this._database = null;
+  }
+
+  async start() {
+    log.info(`tracker(${this.id}): starting`);
+
+    if (this._database == null) {
+      this._database = new PushDatabase(this.databaseFile);
+      await this._database.init();
+    }
+
+    if (this._intervalId == null) {
+      this._intervalId = setIntervalImmediately(
+        () => this._fetchDataPoint(),
+        this.requestInterval * 1000,
+      );
+    }
+  }
+
+  async _fetchDataPoint() {
+    // check if the tracker is still running
+    if (this._intervalId == null || this._database == null) return;
+
+    let timestamp = Math.floor(
+      // UNIX timestamps are stored in seconds, not milliseconds
+      new Date().getTime() / 1000,
+    );
+    let data;
+    try {
+      data = await this.fetcher();
+    } catch (err) {
+      log.warn(`tracker(${this.id}): error:`, err);
+      return;
+    }
+
+    log.info(`tracker(${this.id}): received a data point:`, data);
+    await this._database.push({ timestamp, data });
+  }
+
+  async stop() {
+    log.info(`tracker(${this.id}): stopping`);
+
+    if (this._intervalId != null) {
+      clearInterval(this._intervalId);
+      this._intervalId = null;
+    }
+
+    if (this._database != null) {
+      await this._database.write();
+      this._database = null;
+    }
+  }
+}
 
 function setIntervalImmediately(callback, ms, ...args) {
   callback(...args);
   return setInterval(callback, ms, args);
 }
+
+module.exports = startTrackers;

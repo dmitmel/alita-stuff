@@ -76,7 +76,12 @@ class Database {
       );
 
       stream.on('error', err => reject(err));
-      stream.on('finish', () => resolve());
+      stream.on('finish', () => {
+        log.info(
+          `database(${this.filePath}): wrote ${this.records.length} records`,
+        );
+        resolve();
+      });
 
       this.records.forEach(record => {
         stream.write(`${JSON.stringify(record)}\n`);
@@ -88,6 +93,10 @@ class Database {
 
   push(record) {
     return new Promise((resolve, reject) => {
+      log.info(
+        `database(${this.filePath}): pushing record #${this.records.length +
+          1}`,
+      );
       this.records.push(record);
       fs.appendFile(
         this.filePath,
