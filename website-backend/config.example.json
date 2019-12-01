@@ -3,7 +3,7 @@
     "dir": "database"
   },
   "server": {
-    "host": "0.0.0.0",
+    "hostname": "0.0.0.0",
     "port": 8080
   },
   "trackers": [

@@ -5,7 +5,7 @@ const log = require('./logger');
 const mkdirParents = require('./utils/mkdirParents');
 const fileMode = require('./utils/fileMode');
 const startTrackers = require('./trackers');
-const startServer = require('./server');
+const Server = require('./server');
 
 let shutdownCallbacks = [];
 function shutdown() {
@@ -41,8 +41,9 @@ mkdirParents.sync(databaseDir, DATABASE_DIR_MODE);
     );
     shutdownCallbacks.push(() => stopTrackers());
 
-    let stopServer = await startServer(config.server);
-    shutdownCallbacks.push(() => stopServer());
+    let server = new Server(config.server);
+    await server.start();
+    shutdownCallbacks.push(() => server.stop());
   } catch (err) {
     log.error(err);
     shutdown();

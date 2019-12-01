@@ -2,36 +2,48 @@ const http = require('http');
 const typeCheck = require('./utils/typeCheck');
 const log = require('./logger');
 
-async function startServer(config) {
-  typeCheck.assert(config, 'config', 'Object');
-  let { host, port } = config;
-  typeCheck.assert(host, 'host', 'String');
-  typeCheck.assert(port, 'port', 'Number');
+class Server {
+  constructor(config) {
+    typeCheck.assert(config, 'config', 'Object');
+    let { hostname, port } = config;
+    typeCheck.assert(hostname, 'hostname', 'String');
+    typeCheck.assert(port, 'port', 'Number');
 
-  log.info('starting server');
+    this._hostname = hostname;
+    this._port = port;
 
-  let server = http.createServer((_req, res) => {
-    res.end('Hello world!');
-  });
+    this._server = http.createServer((req, res) =>
+      this.handleRequest(req, res),
+    );
+  }
 
-  await new Promise((resolve, _reject) => {
-    server.listen(port, host, resolve);
-  });
+  async start() {
+    log.info('starting server');
 
-  log.info(`server is listening on http://${host}:${port}`);
+    await new Promise((resolve, _reject) => {
+      this._server.listen(this._port, this._hostname, resolve);
+    });
 
-  function stop() {
+    log.info(`server is listening on http://${this._hostname}:${this._port}`);
+  }
+
+  async stop() {
     log.info('stopping server');
 
-    return new Promise((resolve, reject) => {
-      server.close(err => {
+    await new Promise((resolve, reject) => {
+      this._server.close(err => {
         if (err != null) reject(err);
         else resolve();
       });
     });
   }
 
-  return stop;
+  handleRequest(req, res) {
+    log.info(
+      `request from ${req.connection.remoteAddress}:${req.connection.remotePort}`,
+    );
+    res.end('Hello world!');
+  }
 }
 
-module.exports = startServer;
+module.exports = Server;
