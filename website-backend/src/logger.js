@@ -45,11 +45,11 @@ log.trace = function trace(message, ...args) {
 };
 
 process.on('uncaughtException', error => {
-  log.error(error);
+  log.error('uncaughtException:', error);
 });
 
 process.on('unhandledRejection', (reason, _promise) => {
-  log.error(reason);
+  log.error('unhandledRejection:', reason);
 });
 
 module.exports = log;

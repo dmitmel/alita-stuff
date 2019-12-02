@@ -24,6 +24,7 @@ const TRACKERS = new Map(
 
 class Trackers {
   constructor(trackerConfigs, databaseDir) {
+    log.info('initializing trackers');
     typeCheck.assert(trackerConfigs, 'trackerConfigs', 'Array');
     typeCheck.assert(databaseDir, 'databaseDir', 'String');
 
